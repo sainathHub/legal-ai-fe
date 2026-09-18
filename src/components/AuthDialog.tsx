@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Scale, Lock, Mail, User, Info, CheckCircle2, ArrowRight } from 'lucide-react';
+import { Lock, Mail, User, Info, CheckCircle2, ArrowRight } from 'lucide-react';
 import { 
   Dialog, 
   DialogContent, 
@@ -43,9 +43,6 @@ export default function AuthDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[460px] bg-white border-black/15 text-black p-7 rounded-2xl shadow-[0_30px_60px_rgba(0,0,0,0.15)] backdrop-blur-2xl">
         <DialogHeader className="flex flex-col items-center text-center mb-3">
-          <div className="w-12 h-12 rounded-xl bg-black text-white flex items-center justify-center mb-3 shadow-[0_2px_12px_rgba(0,0,0,0.2)]">
-            <Scale size={24} />
-          </div>
           <DialogTitle className="text-xl font-bold uppercase tracking-wide text-black font-display">
             {mode === 'signin' ? 'COUNSEL SIGN IN' : 'CREATE COUNSEL ACCOUNT'}
           </DialogTitle>
