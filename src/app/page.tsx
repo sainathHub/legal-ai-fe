@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState } from 'react';
-import StackedBackground from '@/components/StackedBackground';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
 import AuthDialog from '@/components/AuthDialog';
@@ -16,10 +15,7 @@ export default function Home() {
   };
 
   return (
-    <div className="relative min-h-screen bg-white text-black selection:bg-black selection:text-white overflow-hidden flex flex-col justify-between">
-      {/* 3D Stacked Rectangles Background Animation */}
-      <StackedBackground />
-
+    <div className="relative min-h-screen bg-white text-black selection:bg-black selection:text-white flex flex-col justify-between">
       {/* Minimal Navbar */}
       <Navbar onOpenAuth={handleOpenAuth} />
 
