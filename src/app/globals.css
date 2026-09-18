@@ -145,6 +145,27 @@
   50% { opacity: 0.95; }
 }
 
+@keyframes horizontalStackFloat {
+  0% {
+    transform: translate3d(
+      calc(var(--layer-index) * var(--h-offset, 46px)),
+      calc(var(--layer-index) * -4px),
+      calc(var(--layer-index) * 16px)
+    );
+  }
+  100% {
+    transform: translate3d(
+      calc(var(--layer-index) * var(--h-offset, 46px)),
+      calc(var(--layer-index) * -4px + 10px),
+      calc(var(--layer-index) * 16px + 6px)
+    );
+  }
+}
+
+.animate-horizontal-stack-float {
+  animation: horizontalStackFloat 5s ease-in-out infinite alternate;
+}
+
 .animate-stack-float {
   animation: stackFloat 6s ease-in-out infinite alternate;
 }
@@ -156,3 +177,4 @@
 .animate-pulse-line {
   animation: pulseLine 2s infinite ease-in-out;
 }
+

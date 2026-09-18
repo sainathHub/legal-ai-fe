@@ -50,13 +50,13 @@ export default function StackedBackground() {
     };
   }, []);
 
+  // 5 horizontal legal dossier cards in a clean horizontal cascade
   const stackLayers: StackLayer[] = [
     { id: 1, zIndex: 1, delay: '0s', label: 'INDIAN PRECEDENTS DB', sub: 'SEC. 14 IBC & ART. 21' },
     { id: 2, zIndex: 2, delay: '0.6s', label: 'LANDMARK JURISPRUDENCE', sub: '1950 - 2026 BENCH ORDERS' },
     { id: 3, zIndex: 3, delay: '1.2s', label: 'RATIO DECIDENDI VECTORS', sub: 'WEAVIATE EMBEDDINGS' },
     { id: 4, zIndex: 4, delay: '1.8s', label: 'GROQ LLM SUMMARIZER', sub: 'LEGAL FACTS & HOLDINGS' },
     { id: 5, zIndex: 5, delay: '2.4s', label: 'JURISPRUDENCE RAG MATRIX', sub: 'HIGH COURT & APEX BENCH' },
-    { id: 6, zIndex: 6, delay: '3.0s', label: 'ACTIVE BRIEF DOSSIER', sub: 'CITATION GRAPH SYNTHESIS' },
   ];
 
   return (
@@ -89,37 +89,38 @@ export default function StackedBackground() {
         className="absolute inset-0 flex items-center justify-center"
         style={{
           perspective: '1200px',
-          perspectiveOrigin: '65% 45%',
+          perspectiveOrigin: '65% 50%',
         }}
       >
-        {/* The Central Isometric Stack */}
+        {/* Simple Horizontal Stack Cluster */}
         <div 
-          className="absolute right-[8%] top-[48%] w-[380px] h-[250px] max-lg:right-1/2 max-lg:top-[65%] max-lg:translate-x-1/2 max-lg:scale-75 max-lg:opacity-40 transition-transform duration-100 ease-out"
+          className="absolute right-[4%] sm:right-[6%] lg:right-[8%] xl:right-[10%] top-[50%] -translate-y-1/2 w-[320px] sm:w-[350px] md:w-[380px] h-[210px] sm:h-[230px] max-lg:opacity-35 max-md:hidden transition-transform duration-100 ease-out"
           style={{
             transformStyle: 'preserve-3d',
             transform: `
               translate3d(0, -50%, 0)
-              rotateX(calc(58deg + (var(--mouse-y) * 8deg)))
-              rotateY(calc(-4deg + (var(--mouse-x) * 8deg)))
-              rotateZ(calc(-36deg + (var(--mouse-x) * 5deg)))
+              rotateY(calc(-14deg + (var(--mouse-x) * 8deg)))
+              rotateX(calc(6deg + (var(--mouse-y) * 6deg)))
+              rotateZ(calc(-1deg + (var(--mouse-x) * 2deg)))
             `,
           }}
         >
           {stackLayers.map((layer, idx) => (
             <div
               key={layer.id}
-              className={`absolute inset-0 rounded-2xl p-5 flex flex-col justify-between backdrop-blur-xl border transition-all duration-300 animate-stack-float ${
-                idx === 5 
-                  ? 'bg-white border-black/30 shadow-[0_30px_60px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.9),0_0_40px_rgba(0,0,0,0.04)]' 
-                  : 'bg-white/95 border-black/15 shadow-[0_20px_40px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.8)]'
+              className={`absolute inset-0 rounded-2xl p-5 flex flex-col justify-between backdrop-blur-xl border transition-all duration-300 animate-horizontal-stack-float ${
+                idx === stackLayers.length - 1
+                  ? 'bg-white border-black/35 shadow-[0_25px_50px_rgba(0,0,0,0.1),inset_0_1px_0_rgba(255,255,255,0.95)]'
+                  : 'bg-white/95 border-black/15 shadow-[0_15px_30px_rgba(0,0,0,0.05),inset_0_1px_0_rgba(255,255,255,0.85)]'
               }`}
               style={{
-                // @ts-expect-error CSS variable
+                // @ts-expect-error CSS variables
                 '--layer-index': idx,
+                '--h-offset': '44px',
                 animationDelay: layer.delay,
                 zIndex: layer.zIndex,
                 transformStyle: 'preserve-3d',
-                transform: `translate3d(calc(${idx} * -18px), calc(${idx} * -18px), calc(${idx} * 38px))`,
+                transform: `translate3d(calc(${idx} * 44px), calc(${idx} * -4px), calc(${idx} * 16px))`,
               }}
             >
               {/* Header */}
