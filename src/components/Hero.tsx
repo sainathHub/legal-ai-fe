@@ -3,7 +3,6 @@
 import React from 'react';
 import { ArrowRight, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 
 interface HeroProps {
   onOpenAuth: (mode: 'signin' | 'signup') => void;
@@ -13,17 +12,6 @@ export default function Hero({ onOpenAuth }: HeroProps) {
   return (
     <section className="relative z-10 pt-36 pb-20 px-6 sm:px-10 flex flex-col justify-center">
       <div className="max-w-6xl mx-auto w-full flex flex-col items-start text-left">
-        {/* Top Status Badge */}
-        <div className="mb-5">
-          <Badge 
-            variant="outline" 
-            className="px-3.5 py-1 rounded-full border-black/15 bg-black/[0.03] backdrop-blur-md text-zinc-700 tracking-wider text-[10.5px] font-mono gap-2 font-normal"
-          >
-            <span className="w-1.5 h-1.5 rounded-full bg-black shadow-[0_0_6px_rgba(0,0,0,0.4)] animate-pulse" />
-            <span>INDIAN JURISPRUDENCE & PRECEDENT RAG ENGINE</span>
-          </Badge>
-        </div>
-
         {/* Simple Left-Aligned Heading */}
         <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-[42px] font-extrabold tracking-tight text-black max-w-2xl leading-[1.18] mb-4 font-display">
           Legal AI for <br />

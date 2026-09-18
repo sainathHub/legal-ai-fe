@@ -30,7 +30,7 @@ export default function Home() {
 
       {/* Subtle Copyright Micro-Bar */}
       <footer className="relative z-10 py-6 px-6 text-center border-t border-black/5 text-[11px] font-mono text-zinc-500 flex flex-col sm:flex-row items-center justify-between max-w-6xl mx-auto w-full gap-2">
-        <span>© {new Date().getFullYear()} JURIS.AI • INDIAN JURISPRUDENCE & PRECEDENT RAG</span>
+        <span>© {new Date().getFullYear()} JURIS.AI</span>
         <span className="text-zinc-400">PURE MONOCHROME EDITION</span>
       </footer>
 
