@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from 'next';
-import { Geist, Geist_Mono } from 'next/font/google';
+import { Geist, Geist_Mono, Playfair_Display } from 'next/font/google';
 import './globals.css';
 
 const geistSans = Geist({
@@ -14,9 +14,15 @@ const geistMono = Geist_Mono({
   display: 'swap',
 });
 
+const playfair = Playfair_Display({
+  variable: '--font-display',
+  subsets: ['latin'],
+  display: 'swap',
+});
+
 export const metadata: Metadata = {
-  title: 'JurisAI — Next-Gen Indian Jurisprudence & Precedent Intelligence',
-  description: 'AI-powered legal intelligence platform for Indian jurisprudence. Instant judgment summarization and high-dimensional semantic case precedent search.',
+  title: 'JurisAI — Legal AI for the Indian Legal System',
+  description: 'AI-powered legal intelligence platform for the Indian legal system. Instant judgment summarization and high-dimensional semantic case precedent search.',
   icons: {
     icon: '/favicon.svg',
   },
@@ -36,7 +42,7 @@ export default function RootLayout({
   return (
     <html 
       lang="en" 
-      className={`light ${geistSans.variable} ${geistMono.variable}`}
+      className={`light ${geistSans.variable} ${geistMono.variable} ${playfair.variable}`}
       suppressHydrationWarning
     >
       <body className="bg-white text-black font-sans antialiased min-h-screen selection:bg-black selection:text-white">

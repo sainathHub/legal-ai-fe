@@ -13,10 +13,10 @@ export default function Hero({ onOpenAuth }: HeroProps) {
     <section className="relative z-10 pt-36 pb-20 px-6 sm:px-10 flex flex-col justify-center">
       <div className="max-w-6xl mx-auto w-full flex flex-col items-start text-left">
         {/* Simple Left-Aligned Heading */}
-        <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-[42px] font-extrabold tracking-tight text-black max-w-2xl leading-[1.18] mb-4 font-display">
-          Legal AI for <br />
+        <h1 className="text-3xl sm:text-4xl md:text-[44px] font-bold tracking-tight text-black max-w-2xl leading-[1.2] mb-4 font-display">
+          Legal AI for the <br />
           <span className="bg-gradient-to-r from-black via-black to-zinc-600 bg-clip-text text-transparent">
-            Indian Jurisprudence
+            Indian Legal System
           </span>
         </h1>
 
