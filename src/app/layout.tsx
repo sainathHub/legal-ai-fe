@@ -15,8 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'JurisAI — Legal AI for the Indian Legal System',
-  description: 'AI-powered legal intelligence platform for the Indian legal system. Instant judgment summarization and high-dimensional semantic case precedent search.',
+  title: 'JurisAI — The Copilot for the Indian Legal System',
+  description: 'The AI copilot for the Indian legal system. Instant judgment summarization and high-dimensional semantic case precedent search.',
   icons: {
     icon: '/favicon.svg',
   },
