@@ -24,11 +24,11 @@ export default function Hero({ onOpenAuth }: HeroProps) {
           </Badge>
         </div>
 
-        {/* Smaller, Refined Left-Aligned Heading */}
-        <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-[42px] font-extrabold uppercase tracking-tight text-black max-w-2xl leading-[1.18] mb-4 font-display">
-          PRECISION LEGAL AI FOR <br />
+        {/* Simple Left-Aligned Heading */}
+        <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-[42px] font-extrabold tracking-tight text-black max-w-2xl leading-[1.18] mb-4 font-display">
+          Legal AI for <br />
           <span className="bg-gradient-to-r from-black via-black to-zinc-600 bg-clip-text text-transparent">
-            INDIAN JURISPRUDENCE.
+            Indian Jurisprudence
           </span>
         </h1>
 
