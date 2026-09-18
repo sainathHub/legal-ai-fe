@@ -54,7 +54,7 @@ export default function Hero({ onOpenAuth }: HeroProps) {
         </div>
 
         {/* Right Column: Simple Stack of Rectangles */}
-        <div className="lg:col-span-5 flex items-center justify-center lg:justify-end pt-4 lg:pt-0">
+        <div className="lg:col-span-5 flex items-center justify-center lg:justify-start lg:pl-4 xl:pl-8 pt-4 lg:pt-0">
           <RectangleStack />
         </div>
       </div>
