@@ -1,25 +1,16 @@
 import type { Metadata, Viewport } from 'next';
-import { Cinzel, Plus_Jakarta_Sans, JetBrains_Mono } from 'next/font/google';
+import { Geist, Geist_Mono } from 'next/font/google';
 import './globals.css';
 
-const cinzel = Cinzel({
-  subsets: ['latin'],
-  weight: ['400', '600', '700', '800', '900'],
-  variable: '--font-display',
-  display: 'swap',
-});
-
-const plusJakarta = Plus_Jakarta_Sans({
-  subsets: ['latin'],
-  weight: ['300', '400', '500', '600', '700', '800'],
+const geistSans = Geist({
   variable: '--font-sans',
+  subsets: ['latin'],
   display: 'swap',
 });
 
-const jetbrainsMono = JetBrains_Mono({
-  subsets: ['latin'],
-  weight: ['400', '500', '600'],
+const geistMono = Geist_Mono({
   variable: '--font-mono',
+  subsets: ['latin'],
   display: 'swap',
 });
 
@@ -45,7 +36,7 @@ export default function RootLayout({
   return (
     <html 
       lang="en" 
-      className={`light ${cinzel.variable} ${plusJakarta.variable} ${jetbrainsMono.variable}`}
+      className={`light ${geistSans.variable} ${geistMono.variable}`}
       suppressHydrationWarning
     >
       <body className="bg-white text-black font-sans antialiased min-h-screen selection:bg-black selection:text-white">
