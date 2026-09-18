@@ -62,7 +62,7 @@ export default function StackedBackground() {
   return (
     <div 
       ref={containerRef}
-      className="fixed inset-0 pointer-events-none overflow-hidden z-0 bg-black"
+      className="fixed inset-0 pointer-events-none overflow-hidden z-0 bg-white"
       style={{
         // @ts-expect-error CSS variable
         '--mouse-x': '0',
@@ -72,25 +72,25 @@ export default function StackedBackground() {
     >
       {/* Ambient monochrome radial glow orbs */}
       <div 
-        className="absolute w-[700px] h-[700px] top-[40%] left-[55%] -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none opacity-15 filter blur-[140px]"
+        className="absolute w-[700px] h-[700px] top-[40%] left-[55%] -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none opacity-40 filter blur-[140px]"
         style={{
-          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.45) 0%, rgba(255, 255, 255, 0.05) 50%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.01) 50%, transparent 70%)',
         }}
       />
       <div 
-        className="absolute w-[500px] h-[500px] -top-24 -right-12 rounded-full pointer-events-none opacity-10 filter blur-[120px]"
+        className="absolute w-[500px] h-[500px] -top-24 -right-12 rounded-full pointer-events-none opacity-30 filter blur-[120px]"
         style={{
-          background: 'radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%)',
+          background: 'radial-gradient(circle, rgba(0, 0, 0, 0.04) 0%, transparent 70%)',
         }}
       />
 
       {/* Subtle Architectural Grid Lines */}
       <div 
-        className="absolute inset-0 opacity-70"
+        className="absolute inset-0 opacity-60"
         style={{
           backgroundImage: `
-            linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-            linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px)
+            linear-gradient(to right, rgba(0, 0, 0, 0.04) 1px, transparent 1px),
+            linear-gradient(to bottom, rgba(0, 0, 0, 0.04) 1px, transparent 1px)
           `,
           backgroundSize: '80px 80px',
           maskImage: 'radial-gradient(ellipse at 60% 40%, black 20%, transparent 80%)',
@@ -124,8 +124,8 @@ export default function StackedBackground() {
               key={layer.id}
               className={`absolute inset-0 rounded-2xl p-5 flex flex-col justify-between backdrop-blur-xl border transition-all duration-300 animate-stack-float ${
                 idx === 5 
-                  ? 'bg-zinc-900/90 border-white/40 shadow-[0_30px_60px_rgba(0,0,0,0.95),inset_0_1px_0_rgba(255,255,255,0.4),0_0_40px_rgba(255,255,255,0.08)]' 
-                  : 'bg-zinc-950/80 border-white/15 shadow-[0_20px_40px_rgba(0,0,0,0.9),inset_0_1px_0_rgba(255,255,255,0.12)]'
+                  ? 'bg-white border-black/30 shadow-[0_30px_60px_rgba(0,0,0,0.12),inset_0_1px_0_rgba(255,255,255,0.9),0_0_40px_rgba(0,0,0,0.04)]' 
+                  : 'bg-white/95 border-black/15 shadow-[0_20px_40px_rgba(0,0,0,0.06),inset_0_1px_0_rgba(255,255,255,0.8)]'
               }`}
               style={{
                 // @ts-expect-error CSS variable
@@ -138,26 +138,26 @@ export default function StackedBackground() {
             >
               {/* Header */}
               <div className="flex items-center gap-2">
-                <span className="w-1.5 h-1.5 rounded-full bg-white shadow-[0_0_8px_#ffffff]" />
-                <span className="font-mono text-[10px] tracking-wider text-zinc-300 font-semibold uppercase">
+                <span className="w-1.5 h-1.5 rounded-full bg-black shadow-[0_0_6px_rgba(0,0,0,0.4)]" />
+                <span className="font-mono text-[10px] tracking-wider text-zinc-900 font-semibold uppercase">
                   {layer.label}
                 </span>
-                <span className="ml-auto font-mono text-[9px] text-zinc-500 bg-white/5 px-1.5 py-0.5 rounded border border-white/10">
+                <span className="ml-auto font-mono text-[9px] text-zinc-600 bg-black/5 px-1.5 py-0.5 rounded border border-black/10 font-medium">
                   INDEX #{layer.id}
                 </span>
               </div>
 
               {/* Wireframe document lines */}
               <div className="flex flex-col gap-1.5 my-3">
-                <div className="h-0.5 rounded w-[85%] bg-gradient-to-r from-white/30 to-white/5" />
-                <div className="h-0.5 rounded w-[65%] bg-gradient-to-r from-white/20 to-white/5" />
-                <div className="h-0.5 rounded w-[40%] bg-gradient-to-r from-white/15 to-white/5" />
+                <div className="h-0.5 rounded w-[85%] bg-gradient-to-r from-black/30 to-black/5" />
+                <div className="h-0.5 rounded w-[65%] bg-gradient-to-r from-black/20 to-black/5" />
+                <div className="h-0.5 rounded w-[40%] bg-gradient-to-r from-black/15 to-black/5" />
               </div>
 
               {/* Footer */}
-              <div className="flex justify-between items-center text-[10px] text-zinc-400 uppercase border-t border-white/10 pt-2">
+              <div className="flex justify-between items-center text-[10px] text-zinc-600 uppercase border-t border-black/10 pt-2 font-medium">
                 <span>{layer.sub}</span>
-                <span className="font-mono text-zinc-600">0x{layer.id}A9</span>
+                <span className="font-mono text-zinc-400">0x{layer.id}A9</span>
               </div>
             </div>
           ))}
@@ -165,19 +165,19 @@ export default function StackedBackground() {
 
         {/* Ambient floating perimeter wireframe rectangles */}
         <div 
-          className="absolute w-40 h-24 top-[15%] left-[8%] border border-white/10 bg-white/[0.015] backdrop-blur-sm rounded-lg animate-ambient-drift max-md:hidden"
+          className="absolute w-40 h-24 top-[15%] left-[8%] border border-black/10 bg-black/[0.01] backdrop-blur-sm rounded-lg animate-ambient-drift max-md:hidden"
           style={{ animationDuration: '24s', transform: 'rotate(14deg)' }}
         />
         <div 
-          className="absolute w-56 h-32 bottom-[12%] left-[18%] border border-white/10 bg-white/[0.015] backdrop-blur-sm rounded-lg animate-ambient-drift max-md:hidden"
+          className="absolute w-56 h-32 bottom-[12%] left-[18%] border border-black/10 bg-black/[0.01] backdrop-blur-sm rounded-lg animate-ambient-drift max-md:hidden"
           style={{ animationDuration: '28s', animationDelay: '-5s', transform: 'rotate(-12deg)' }}
         />
         <div 
-          className="absolute w-36 h-20 top-[22%] right-[35%] border border-white/10 bg-white/[0.015] backdrop-blur-sm rounded-lg animate-ambient-drift max-md:hidden"
+          className="absolute w-36 h-20 top-[22%] right-[35%] border border-black/10 bg-black/[0.01] backdrop-blur-sm rounded-lg animate-ambient-drift max-md:hidden"
           style={{ animationDuration: '20s', animationDelay: '-10s', transform: 'rotate(-22deg)' }}
         />
         <div 
-          className="absolute w-44 h-28 bottom-[25%] right-[5%] border border-white/10 bg-white/[0.015] backdrop-blur-sm rounded-lg animate-ambient-drift max-md:hidden"
+          className="absolute w-44 h-28 bottom-[25%] right-[5%] border border-black/10 bg-black/[0.01] backdrop-blur-sm rounded-lg animate-ambient-drift max-md:hidden"
           style={{ animationDuration: '32s', animationDelay: '-15s', transform: 'rotate(8deg)' }}
         />
       </div>

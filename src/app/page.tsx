@@ -16,7 +16,7 @@ export default function Home() {
   };
 
   return (
-    <div className="relative min-h-screen bg-black text-white selection:bg-white selection:text-black overflow-hidden flex flex-col justify-between">
+    <div className="relative min-h-screen bg-white text-black selection:bg-black selection:text-white overflow-hidden flex flex-col justify-between">
       {/* 3D Stacked Rectangles Background Animation */}
       <StackedBackground />
 
@@ -29,9 +29,9 @@ export default function Home() {
       </main>
 
       {/* Subtle Copyright Micro-Bar */}
-      <footer className="relative z-10 py-6 px-6 text-center border-t border-white/5 text-[11px] font-mono text-zinc-500 flex flex-col sm:flex-row items-center justify-between max-w-6xl mx-auto w-full gap-2">
+      <footer className="relative z-10 py-6 px-6 text-center border-t border-black/5 text-[11px] font-mono text-zinc-500 flex flex-col sm:flex-row items-center justify-between max-w-6xl mx-auto w-full gap-2">
         <span>© {new Date().getFullYear()} JURIS.AI • INDIAN JURISPRUDENCE & PRECEDENT RAG</span>
-        <span className="text-zinc-600">OLED MONOCHROME EDITION</span>
+        <span className="text-zinc-400">PURE MONOCHROME EDITION</span>
       </footer>
 
       {/* Auth Dialog (ShadCN Modal) */}

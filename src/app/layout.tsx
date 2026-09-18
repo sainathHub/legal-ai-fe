@@ -32,7 +32,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#000000',
+  themeColor: '#ffffff',
   width: 'device-width',
   initialScale: 1,
 };
@@ -45,10 +45,10 @@ export default function RootLayout({
   return (
     <html 
       lang="en" 
-      className={`dark ${cinzel.variable} ${plusJakarta.variable} ${jetbrainsMono.variable}`}
+      className={`light ${cinzel.variable} ${plusJakarta.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
     >
-      <body className="bg-black text-white font-sans antialiased min-h-screen selection:bg-white selection:text-black">
+      <body className="bg-white text-black font-sans antialiased min-h-screen selection:bg-black selection:text-white">
         <div className="noise-overlay" aria-hidden="true" />
         {children}
       </body>
