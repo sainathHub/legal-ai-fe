@@ -14,7 +14,7 @@ export default function Hero({ onOpenAuth }: HeroProps) {
       <div className="max-w-6xl mx-auto w-full flex flex-col items-start text-left">
         {/* Simple Left-Aligned Heading */}
         <h1 className="text-3xl sm:text-4xl md:text-[44px] font-bold tracking-tight text-black max-w-2xl leading-[1.2] mb-4 font-display">
-          The Copilot for the <br />
+          Copilot for the <br />
           <span className="bg-gradient-to-r from-black via-black to-zinc-600 bg-clip-text text-transparent">
             Indian Legal System
           </span>
