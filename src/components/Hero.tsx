@@ -11,7 +11,7 @@ interface HeroProps {
 
 export default function Hero({ onOpenAuth }: HeroProps) {
   return (
-    <section className="relative z-10 pt-36 pb-20 px-6 sm:px-10 flex flex-col justify-center">
+    <section className="relative z-10 pt-36 pb-20 px-6 sm:px-10 flex flex-col justify-center overflow-x-clip">
       <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
         {/* Left Column: Heading, description, CTA buttons */}
         <div className="lg:col-span-7 flex flex-col items-start text-left">
