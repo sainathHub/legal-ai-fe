@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Scale, ArrowRight } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 interface NavbarProps {
@@ -28,19 +28,11 @@ export default function Navbar({ onOpenAuth }: NavbarProps) {
       }`}
     >
       <div className="max-w-6xl mx-auto px-6 flex items-center justify-between">
-        {/* Brand Logo */}
-        <a href="#" className="flex items-center gap-3 text-black group">
-          <div className="w-9 h-9 rounded-lg bg-black text-white flex items-center justify-center shadow-[0_2px_12px_rgba(0,0,0,0.15)] group-hover:scale-105 transition-transform duration-200">
-            <Scale size={20} strokeWidth={2.2} />
-          </div>
-          <div className="flex flex-col">
-            <span className="text-lg font-extrabold tracking-widest leading-none font-display text-black">
-              JURIS.AI
-            </span>
-            <span className="font-mono text-[9px] tracking-widest text-zinc-500">
-              LEGAL INTEL
-            </span>
-          </div>
+        {/* Brand Name */}
+        <a href="#" className="flex items-center text-black group">
+          <span className="text-lg font-bold tracking-widest text-black">
+            JURIS.AI
+          </span>
         </a>
 
         {/* Action CTAs */}
