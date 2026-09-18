@@ -70,20 +70,6 @@ export default function StackedBackground() {
       }}
       aria-hidden="true"
     >
-      {/* Ambient monochrome radial glow orbs */}
-      <div 
-        className="absolute w-[700px] h-[700px] top-[40%] left-[55%] -translate-x-1/2 -translate-y-1/2 rounded-full pointer-events-none opacity-40 filter blur-[140px]"
-        style={{
-          background: 'radial-gradient(circle, rgba(0, 0, 0, 0.05) 0%, rgba(0, 0, 0, 0.01) 50%, transparent 70%)',
-        }}
-      />
-      <div 
-        className="absolute w-[500px] h-[500px] -top-24 -right-12 rounded-full pointer-events-none opacity-30 filter blur-[120px]"
-        style={{
-          background: 'radial-gradient(circle, rgba(0, 0, 0, 0.04) 0%, transparent 70%)',
-        }}
-      />
-
       {/* Subtle Architectural Grid Lines */}
       <div 
         className="absolute inset-0 opacity-60"
@@ -162,24 +148,6 @@ export default function StackedBackground() {
             </div>
           ))}
         </div>
-
-        {/* Ambient floating perimeter wireframe rectangles */}
-        <div 
-          className="absolute w-40 h-24 top-[15%] left-[8%] border border-black/10 bg-black/[0.01] backdrop-blur-sm rounded-lg animate-ambient-drift max-md:hidden"
-          style={{ animationDuration: '24s', transform: 'rotate(14deg)' }}
-        />
-        <div 
-          className="absolute w-56 h-32 bottom-[12%] left-[18%] border border-black/10 bg-black/[0.01] backdrop-blur-sm rounded-lg animate-ambient-drift max-md:hidden"
-          style={{ animationDuration: '28s', animationDelay: '-5s', transform: 'rotate(-12deg)' }}
-        />
-        <div 
-          className="absolute w-36 h-20 top-[22%] right-[35%] border border-black/10 bg-black/[0.01] backdrop-blur-sm rounded-lg animate-ambient-drift max-md:hidden"
-          style={{ animationDuration: '20s', animationDelay: '-10s', transform: 'rotate(-22deg)' }}
-        />
-        <div 
-          className="absolute w-44 h-28 bottom-[25%] right-[5%] border border-black/10 bg-black/[0.01] backdrop-blur-sm rounded-lg animate-ambient-drift max-md:hidden"
-          style={{ animationDuration: '32s', animationDelay: '-15s', transform: 'rotate(8deg)' }}
-        />
       </div>
     </div>
   );
