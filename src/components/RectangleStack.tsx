@@ -6,14 +6,14 @@ import React, { useState, useEffect, useRef } from 'react';
 const TENNR_LAYERS = [
   { index: 0, d: "M618,328.58l355.63-223.58v1063.5l-355.63,222.5V328.58Z", opacity: 0.25, strokeOpacity: 0.15 },
   { index: 1, d: "M668,378.58l355.63-223.58v1061l-355.63,227V378.58Z", opacity: 0.32, strokeOpacity: 0.20 },
-  { index: 2, d: "M716,426.58l355.63-223.58v1064l-355.63,222.5V426.58Z", opacity: 0.40, strokeOpacity: 0.25, label: "Research" },
+  { index: 2, d: "M716,426.58l355.63-223.58v1064l-355.63,222.5V426.58Z", opacity: 0.40, strokeOpacity: 0.25 },
   { index: 3, d: "M762,472.58l355.63-223.58v1061.27l-355.63,226.73V472.58Z", opacity: 0.48, strokeOpacity: 0.32 },
   { index: 4, d: "M806,516.58l355.63-223.58v1064.27l-355.63,221.42V516.58Z", opacity: 0.58, strokeOpacity: 0.40 },
-  { index: 5, d: "M848,558.58l355.63-223.58v1066.27l-355.63,220.42V558.58Z", opacity: 0.68, strokeOpacity: 0.50, label: "Draft" },
+  { index: 5, d: "M848,558.58l355.63-223.58v1066.27l-355.63,220.42V558.58Z", opacity: 0.68, strokeOpacity: 0.50 },
   { index: 6, d: "M888,598.58l355.63-223.58v1063.27l-355.63,223.42V598.58Z", opacity: 0.78, strokeOpacity: 0.60 },
   { index: 7, d: "M926,628.81l355.63-223.58v1063.27l-355.63,223.5V628.81Z", opacity: 0.86, strokeOpacity: 0.70 },
   { index: 8, d: "M962,672.58l355.63-223.58v1063.5l-355.63,222.42V672.58Z", opacity: 0.94, strokeOpacity: 0.80 },
-  { index: 9, d: "M998,706.58l355.63-223.58v1063.27l-355.63,221.42V706.58Z", opacity: 1.00, strokeOpacity: 0.95, label: "Clauses" },
+  { index: 9, d: "M998,706.58l355.63-223.58v1063.27l-355.63,221.42V706.58Z", opacity: 1.00, strokeOpacity: 0.95 },
 ];
 
 export default function RectangleStack() {
@@ -108,58 +108,6 @@ export default function RectangleStack() {
           );
         })}
       </svg>
-
-      {/* Synchronized Feature Callouts: Research, Draft, Clauses */}
-      {/* 1. Research Callout (Top) */}
-      <div 
-        className="absolute top-2 right-24 sm:right-28 flex flex-col items-center pointer-events-none transition-all duration-300 ease-out"
-        style={{
-          opacity: isHovered ? 1 : 0,
-          transform: `translate3d(${mouseOffset.x * 12}px, ${isHovered ? mouseOffset.y * 10 - 8 : mouseOffset.y * 10}px, 0)`,
-        }}
-      >
-        <span className="text-xs sm:text-[13px] font-medium tracking-normal text-black whitespace-nowrap mb-1">
-          Research
-        </span>
-        <span 
-          className="w-[1px] bg-zinc-800 transition-all duration-300 ease-out"
-          style={{ height: isHovered ? '28px' : '0px' }}
-        />
-      </div>
-
-      {/* 2. Draft Callout (Right) */}
-      <div 
-        className="absolute top-1/2 -translate-y-1/2 -right-4 sm:-right-8 flex items-center pointer-events-none transition-all duration-300 ease-out"
-        style={{
-          opacity: isHovered ? 1 : 0,
-          transform: `translate3d(${isHovered ? mouseOffset.x * 18 + 8 : mouseOffset.x * 18}px, ${mouseOffset.y * 14}px, 0)`,
-        }}
-      >
-        <span 
-          className="h-[1px] bg-zinc-800 transition-all duration-300 ease-out"
-          style={{ width: isHovered ? '36px' : '0px' }}
-        />
-        <span className="pl-2 text-xs sm:text-[13px] font-medium tracking-normal text-black whitespace-nowrap">
-          Draft
-        </span>
-      </div>
-
-      {/* 3. Clauses Callout (Bottom) */}
-      <div 
-        className="absolute bottom-4 left-16 sm:left-20 flex flex-col items-center pointer-events-none transition-all duration-300 ease-out"
-        style={{
-          opacity: isHovered ? 1 : 0,
-          transform: `translate3d(${mouseOffset.x * 24}px, ${isHovered ? mouseOffset.y * 18 + 8 : mouseOffset.y * 18}px, 0)`,
-        }}
-      >
-        <span 
-          className="w-[1px] bg-zinc-800 transition-all duration-300 ease-out"
-          style={{ height: isHovered ? '28px' : '0px' }}
-        />
-        <span className="text-xs sm:text-[13px] font-medium tracking-normal text-black whitespace-nowrap mt-1">
-          Clauses
-        </span>
-      </div>
     </div>
   );
 }
