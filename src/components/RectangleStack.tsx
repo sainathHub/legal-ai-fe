@@ -33,16 +33,16 @@ export default function RectangleStack() {
         </div>
       </div>
 
-      {/* Foreground Rectangle 1 (Top layer) -> HIGHLIGHT CLAUSES (Bottom position) */}
+      {/* Foreground Rectangle 1 (Top layer) -> CLAUSES (Bottom position) */}
       <div 
         className="relative w-full h-full rounded-xl border border-zinc-300 bg-white shadow-[0_6px_24px_rgba(0,0,0,0.06)] transition-all duration-300 ease-out group-hover:-translate-x-1 group-hover:-translate-y-1 group-hover:shadow-[0_12px_32px_rgba(0,0,0,0.09)]"
         style={{ zIndex: 3 }}
       >
-        {/* Distinct Position 3: Line going DOWN to 'Highlight Clauses' */}
+        {/* Distinct Position 3: Line going DOWN to 'Clauses' */}
         <div className="absolute -bottom-1 left-10 sm:left-12 translate-y-full flex flex-col items-center pointer-events-none pt-1">
           <span className="w-[1px] h-6 sm:h-8 bg-zinc-300 group-hover:bg-zinc-800 transition-colors" />
           <span className="text-xs sm:text-[13px] font-medium tracking-normal text-zinc-500 group-hover:text-black transition-colors whitespace-nowrap mt-1.5">
-            Highlight Clauses
+            Clauses
           </span>
         </div>
       </div>
