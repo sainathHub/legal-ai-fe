@@ -1,11 +1,10 @@
 'use client';
 
 import React from 'react';
-import { ArrowRight, ChevronRight, FileText, Search, Database } from 'lucide-react';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { ArrowRight, Lock, FileText, Search, Database } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
 
 interface HeroProps {
   onOpenAuth: (mode: 'signin' | 'signup') => void;
@@ -13,10 +12,10 @@ interface HeroProps {
 
 export default function Hero({ onOpenAuth }: HeroProps) {
   return (
-    <section className="relative z-10 pt-36 pb-20 px-6 flex flex-col items-center justify-center min-h-[92vh]" id="overview">
+    <section className="relative z-10 pt-28 pb-12 sm:py-24 px-6 flex flex-col items-center justify-center">
       <div className="max-w-6xl mx-auto flex flex-col items-center text-center">
         {/* Top Status Badge */}
-        <div className="mb-7">
+        <div className="mb-6">
           <Badge 
             variant="outline" 
             className="px-4 py-1.5 rounded-full border-white/20 bg-white/[0.04] backdrop-blur-md text-zinc-300 tracking-wider text-[11px] font-mono gap-2.5 font-normal"
@@ -42,7 +41,7 @@ export default function Hero({ onOpenAuth }: HeroProps) {
         </p>
 
         {/* CTA Actions */}
-        <div className="flex items-center justify-center gap-4 flex-wrap mb-10">
+        <div className="flex items-center justify-center gap-4 flex-wrap mb-12">
           <Button
             size="lg"
             onClick={() => onOpenAuth('signup')}
@@ -52,20 +51,19 @@ export default function Hero({ onOpenAuth }: HeroProps) {
             <ArrowRight size={18} className="ml-2" />
           </Button>
 
-          <a
-            href="#demo"
-            className={cn(
-              buttonVariants({ variant: 'outline', size: 'lg' }),
-              'border-white/20 bg-white/[0.04] text-white hover:bg-white/10 hover:border-white/40 rounded-full px-7 py-6 text-base cursor-pointer backdrop-blur-md'
-            )}
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => onOpenAuth('signin')}
+            className="border-white/20 bg-white/[0.04] text-white hover:bg-white/10 hover:border-white/40 rounded-full px-7 py-6 text-base cursor-pointer backdrop-blur-md"
           >
-            <span>Explore Interactive Demo</span>
-            <ChevronRight size={18} className="ml-1" />
-          </a>
+            <Lock size={16} className="mr-2 text-zinc-400" />
+            <span>Counsel Sign In</span>
+          </Button>
         </div>
 
         {/* Trust & Architecture Row */}
-        <div className="flex items-center justify-center gap-4 sm:gap-6 flex-wrap text-xs text-zinc-400 font-mono tracking-wider mb-16">
+        <div className="flex items-center justify-center gap-4 sm:gap-6 flex-wrap text-xs text-zinc-400 font-mono tracking-wider mb-14">
           <div className="inline-flex items-center gap-2 hover:text-white transition-colors">
             <FileText size={15} />
             <span>Automated Brief Summarizer</span>

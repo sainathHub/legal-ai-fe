@@ -4,9 +4,6 @@ import React, { useState } from 'react';
 import StackedBackground from '@/components/StackedBackground';
 import Navbar from '@/components/Navbar';
 import Hero from '@/components/Hero';
-import FeatureShowcase from '@/components/FeatureShowcase';
-import Architecture from '@/components/Architecture';
-import Footer from '@/components/Footer';
 import AuthDialog from '@/components/AuthDialog';
 
 export default function Home() {
@@ -19,22 +16,23 @@ export default function Home() {
   };
 
   return (
-    <div className="relative min-h-screen bg-black text-white selection:bg-white selection:text-black">
+    <div className="relative min-h-screen bg-black text-white selection:bg-white selection:text-black overflow-hidden flex flex-col justify-between">
       {/* 3D Stacked Rectangles Background Animation */}
       <StackedBackground />
 
-      {/* Navigation Bar */}
+      {/* Minimal Navbar */}
       <Navbar onOpenAuth={handleOpenAuth} />
 
-      {/* Main Sections */}
-      <main className="relative z-10">
+      {/* The Single Dedicated Landing Section */}
+      <main className="relative z-10 flex-1 flex flex-col justify-center">
         <Hero onOpenAuth={handleOpenAuth} />
-        <FeatureShowcase onOpenAuth={handleOpenAuth} />
-        <Architecture />
       </main>
 
-      {/* Footer */}
-      <Footer />
+      {/* Subtle Copyright Micro-Bar */}
+      <footer className="relative z-10 py-6 px-6 text-center border-t border-white/5 text-[11px] font-mono text-zinc-500 flex flex-col sm:flex-row items-center justify-between max-w-6xl mx-auto w-full gap-2">
+        <span>© {new Date().getFullYear()} JURIS.AI • INDIAN JURISPRUDENCE & PRECEDENT RAG</span>
+        <span className="text-zinc-600">OLED MONOCHROME EDITION</span>
+      </footer>
 
       {/* Auth Dialog (ShadCN Modal) */}
       <AuthDialog
