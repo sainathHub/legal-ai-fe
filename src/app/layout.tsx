@@ -28,6 +28,8 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+import Providers from '@/components/Providers';
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -41,7 +43,7 @@ export default function RootLayout({
     >
       <body className="bg-white text-black font-sans antialiased min-h-screen selection:bg-black selection:text-white">
         <div className="noise-overlay" aria-hidden="true" />
-        {children}
+        <Providers>{children}</Providers>
       </body>
     </html>
   );

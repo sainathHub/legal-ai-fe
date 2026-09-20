@@ -1,7 +1,8 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Lock, Mail, User, Info, CheckCircle2, ArrowRight } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { Lock, Mail, User, CheckCircle2, ArrowRight, ShieldCheck, AlertCircle, Loader2 } from 'lucide-react';
 import { 
   Dialog, 
   DialogContent, 
@@ -11,6 +12,8 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useAuth } from '@/lib/context/AuthContext';
+import { ApiError } from '@/lib/api/client';
 
 interface AuthDialogProps {
   open: boolean;
@@ -23,20 +26,61 @@ export default function AuthDialog({
   initialMode = 'signin',
   onOpenChange,
 }: AuthDialogProps) {
+  const router = useRouter();
+  const { login, register, backendHealth } = useAuth();
+
   const [mode, setMode] = useState<'signin' | 'signup'>(initialMode);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [submitted, setSubmitted] = useState(false);
+  const [fullName, setFullName] = useState('');
+  const [barCouncilId, setBarCouncilId] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     setMode(initialMode);
-    setSubmitted(false);
+    setErrorMsg(null);
+    setSuccess(false);
   }, [initialMode, open]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSubmitted(true);
+    setErrorMsg(null);
+    setLoading(true);
+
+    try {
+      if (mode === 'signin') {
+        await login({ email: email.trim(), password });
+      } else {
+        if (password.length < 8) {
+          setErrorMsg('Password must be at least 8 characters long.');
+          setLoading(false);
+          return;
+        }
+        await register({
+          email: email.trim(),
+          password,
+          full_name: fullName.trim(),
+          bar_council_id: barCouncilId.trim() || null,
+        });
+      }
+      setSuccess(true);
+      setTimeout(() => {
+        onOpenChange(false);
+        router.push('/console');
+      }, 900);
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setErrorMsg(err.message);
+      } else if (err instanceof Error) {
+        setErrorMsg(err.message);
+      } else {
+        setErrorMsg('An unexpected error occurred. Please check backend connection.');
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -47,7 +91,7 @@ export default function AuthDialog({
             {mode === 'signin' ? 'COUNSEL SIGN IN' : 'CREATE COUNSEL ACCOUNT'}
           </DialogTitle>
           <DialogDescription className="text-zinc-600 text-xs mt-1">
-            Access Indian jurisprudence briefs, precedent vector search, and courtroom drafting tools.
+            Connected to Render FastAPI Backend • Supreme Court Jurisprudence Engine
           </DialogDescription>
         </DialogHeader>
 
@@ -60,7 +104,7 @@ export default function AuthDialog({
                 ? 'bg-black text-white shadow-sm' 
                 : 'text-zinc-600 hover:text-black'
             }`}
-            onClick={() => { setMode('signin'); setSubmitted(false); }}
+            onClick={() => { setMode('signin'); setErrorMsg(null); }}
           >
             Sign In
           </button>
@@ -71,49 +115,69 @@ export default function AuthDialog({
                 ? 'bg-black text-white shadow-sm' 
                 : 'text-zinc-600 hover:text-black'
             }`}
-            onClick={() => { setMode('signup'); setSubmitted(false); }}
+            onClick={() => { setMode('signup'); setErrorMsg(null); }}
           >
             Create Account
           </button>
         </div>
 
-        {submitted ? (
-          <div className="flex flex-col items-center text-center gap-3 py-4">
-            <CheckCircle2 size={36} className="text-black animate-bounce" />
-            <h4 className="text-lg font-bold text-black font-display">DEMO ACCESS GRANTED</h4>
-            <p className="text-xs text-zinc-600 leading-relaxed mb-2">
-              Backend JWT authentication is queued for the upcoming milestone. 
-              You now have full preview access to the Legal AI research workspace.
+        {errorMsg && (
+          <div className="p-3 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2 animate-in fade-in slide-in-from-top-1">
+            <AlertCircle size={15} className="shrink-0 mt-0.5" />
+            <div className="leading-snug">{errorMsg}</div>
+          </div>
+        )}
+
+        {success ? (
+          <div className="flex flex-col items-center text-center gap-3 py-6">
+            <div className="w-12 h-12 rounded-full bg-black text-white flex items-center justify-center animate-pulse">
+              <CheckCircle2 size={28} />
+            </div>
+            <h4 className="text-lg font-bold text-black font-display">AUTHENTICATED</h4>
+            <p className="text-xs text-zinc-600 leading-relaxed">
+              JWT session established with PostgreSQL. Entering Research Console...
             </p>
-            <Button
-              className="w-full bg-black text-white hover:bg-zinc-800 font-semibold"
-              onClick={() => onOpenChange(false)}
-            >
-              Enter Research Console
-            </Button>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-3.5">
             {mode === 'signup' && (
-              <div className="flex flex-col gap-1.5">
-                <label className="font-mono text-[10px] text-zinc-600 tracking-wider">
-                  FULL NAME / LAW FIRM
-                </label>
-                <div className="relative flex items-center">
-                  <User size={15} className="absolute left-3 text-zinc-400 pointer-events-none" />
-                  <Input
-                    type="text"
-                    required
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Adv. Siddhartha Reddy"
-                    className="pl-9 bg-zinc-50 border-black/15 text-black placeholder:text-zinc-400 focus-visible:border-black focus-visible:ring-0"
-                  />
+              <>
+                <div className="flex flex-col gap-1">
+                  <label className="font-mono text-[10px] text-zinc-600 tracking-wider">
+                    COUNSEL FULL NAME
+                  </label>
+                  <div className="relative flex items-center">
+                    <User size={15} className="absolute left-3 text-zinc-400 pointer-events-none" />
+                    <Input
+                      type="text"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                      placeholder="Adv. Siddhartha Reddy"
+                      className="pl-9 bg-zinc-50 border-black/15 text-black placeholder:text-zinc-400 focus-visible:border-black focus-visible:ring-0 text-sm"
+                    />
+                  </div>
                 </div>
-              </div>
+
+                <div className="flex flex-col gap-1">
+                  <label className="font-mono text-[10px] text-zinc-600 tracking-wider">
+                    BAR COUNCIL ENROLLMENT ID (OPTIONAL)
+                  </label>
+                  <div className="relative flex items-center">
+                    <ShieldCheck size={15} className="absolute left-3 text-zinc-400 pointer-events-none" />
+                    <Input
+                      type="text"
+                      value={barCouncilId}
+                      onChange={(e) => setBarCouncilId(e.target.value)}
+                      placeholder="e.g. D/1420/2021"
+                      className="pl-9 bg-zinc-50 border-black/15 text-black placeholder:text-zinc-400 focus-visible:border-black focus-visible:ring-0 text-sm"
+                    />
+                  </div>
+                </div>
+              </>
             )}
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1">
               <label className="font-mono text-[10px] text-zinc-600 tracking-wider">
                 OFFICIAL EMAIL ADDRESS
               </label>
@@ -125,39 +189,55 @@ export default function AuthDialog({
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="counsel@chambers.in"
-                  className="pl-9 bg-zinc-50 border-black/15 text-black placeholder:text-zinc-400 focus-visible:border-black focus-visible:ring-0"
+                  className="pl-9 bg-zinc-50 border-black/15 text-black placeholder:text-zinc-400 focus-visible:border-black focus-visible:ring-0 text-sm"
                 />
               </div>
             </div>
 
-            <div className="flex flex-col gap-1.5">
+            <div className="flex flex-col gap-1">
               <label className="font-mono text-[10px] text-zinc-600 tracking-wider">
-                SECURE PASSWORD
+                SECURE PASSWORD {mode === 'signup' && '(MIN 8 CHARACTERS)'}
               </label>
               <div className="relative flex items-center">
                 <Lock size={15} className="absolute left-3 text-zinc-400 pointer-events-none" />
                 <Input
                   type="password"
                   required
+                  minLength={mode === 'signup' ? 8 : undefined}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••••••"
-                  className="pl-9 bg-zinc-50 border-black/15 text-black placeholder:text-zinc-400 focus-visible:border-black focus-visible:ring-0"
+                  className="pl-9 bg-zinc-50 border-black/15 text-black placeholder:text-zinc-400 focus-visible:border-black focus-visible:ring-0 text-sm"
                 />
               </div>
             </div>
 
             <Button 
               type="submit" 
-              className="w-full bg-black text-white hover:bg-zinc-800 font-semibold py-5 cursor-pointer mt-2 shadow-[0_2px_12px_rgba(0,0,0,0.15)]"
+              disabled={loading}
+              className="w-full bg-black text-white hover:bg-zinc-800 font-semibold py-5 cursor-pointer mt-2 shadow-[0_2px_12px_rgba(0,0,0,0.15)] disabled:opacity-60"
             >
-              <span>{mode === 'signin' ? 'Sign In to Workspace' : 'Initialize Account'}</span>
-              <ArrowRight size={16} className="ml-2" />
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="mr-2 animate-spin" />
+                  <span>Connecting to Render...</span>
+                </>
+              ) : (
+                <>
+                  <span>{mode === 'signin' ? 'Sign In to Workspace' : 'Register Counsel Account'}</span>
+                  <ArrowRight size={16} className="ml-2" />
+                </>
+              )}
             </Button>
 
-            <div className="flex items-center justify-center gap-1.5 text-[11px] text-zinc-500 font-mono text-center mt-1">
-              <Info size={13} className="shrink-0" />
-              <span>Full Supabase / JWT backend to connect in Phase 2.</span>
+            <div className="flex items-center justify-between text-[10px] font-mono text-zinc-400 pt-2 border-t border-black/5">
+              <span className="truncate max-w-[240px]">
+                Host: {backendHealth.apiUrl.replace(/^https?:\/\//, '')}
+              </span>
+              <span className="flex items-center gap-1 text-emerald-600 font-medium">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                {backendHealth.state === 'online' ? 'Live' : backendHealth.state}
+              </span>
             </div>
           </form>
         )}

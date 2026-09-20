@@ -1,20 +1,41 @@
 'use client';
 
 import React from 'react';
-import { ArrowRight, Lock } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ArrowRight, Lock, Terminal, ShieldCheck } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import RectangleStack from '@/components/RectangleStack';
+import { useAuth } from '@/lib/context/AuthContext';
 
 interface HeroProps {
   onOpenAuth: (mode: 'signin' | 'signup') => void;
 }
 
 export default function Hero({ onOpenAuth }: HeroProps) {
+  const router = useRouter();
+  const { isAuthenticated, user } = useAuth();
+
+  const handleLaunchConsole = () => {
+    if (isAuthenticated) {
+      router.push('/console');
+    } else {
+      onOpenAuth('signup');
+    }
+  };
+
   return (
     <section className="relative z-10 pt-36 pb-20 px-6 sm:px-10 flex flex-col justify-center overflow-x-clip">
       <div className="max-w-6xl mx-auto w-full grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
         {/* Left Column: Heading, description, CTA buttons */}
         <div className="lg:col-span-7 flex flex-col items-start text-left">
+          {/* Active Counsel Indicator if logged in */}
+          {isAuthenticated && user && (
+            <div className="mb-4 inline-flex items-center gap-2 px-3 py-1 rounded-full bg-black/5 border border-black/10 text-xs font-mono text-zinc-700">
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>Advocate Session Active: <strong>{user.full_name}</strong></span>
+            </div>
+          )}
+
           {/* Simple Left-Aligned Heading */}
           <h1 className="text-3xl sm:text-4xl md:text-[44px] font-bold tracking-tight text-black max-w-2xl leading-[1.2] mb-4 font-display">
             Copilot for the <br />
@@ -34,22 +55,43 @@ export default function Hero({ onOpenAuth }: HeroProps) {
           <div className="flex items-center justify-start gap-3.5 flex-wrap">
             <Button
               size="default"
-              onClick={() => onOpenAuth('signup')}
+              onClick={handleLaunchConsole}
               className="bg-black text-white hover:bg-zinc-800 font-semibold rounded-full px-6 py-5 text-sm cursor-pointer shadow-[0_3px_15px_rgba(0,0,0,0.18)] hover:shadow-[0_5px_24px_rgba(0,0,0,0.28)] hover:-translate-y-0.5 transition-all"
             >
-              <span>Launch Research Console</span>
-              <ArrowRight size={15} className="ml-1.5" />
+              {isAuthenticated ? (
+                <>
+                  <Terminal size={15} className="mr-2" />
+                  <span>Open Research Console</span>
+                </>
+              ) : (
+                <>
+                  <span>Launch Research Console</span>
+                  <ArrowRight size={15} className="ml-1.5" />
+                </>
+              )}
             </Button>
 
-            <Button
-              variant="outline"
-              size="default"
-              onClick={() => onOpenAuth('signin')}
-              className="border-black/20 bg-white/80 text-black hover:bg-zinc-100 hover:border-black/40 rounded-full px-6 py-5 text-sm cursor-pointer backdrop-blur-md shadow-sm"
-            >
-              <Lock size={14} className="mr-1.5 text-zinc-600" />
-              <span>Counsel Sign In</span>
-            </Button>
+            {!isAuthenticated ? (
+              <Button
+                variant="outline"
+                size="default"
+                onClick={() => onOpenAuth('signin')}
+                className="border-black/20 bg-white/80 text-black hover:bg-zinc-100 hover:border-black/40 rounded-full px-6 py-5 text-sm cursor-pointer backdrop-blur-md shadow-sm"
+              >
+                <Lock size={14} className="mr-1.5 text-zinc-600" />
+                <span>Counsel Sign In</span>
+              </Button>
+            ) : (
+              <Button
+                variant="outline"
+                size="default"
+                onClick={() => router.push('/console?tab=projects')}
+                className="border-black/20 bg-white/80 text-black hover:bg-zinc-100 hover:border-black/40 rounded-full px-6 py-5 text-sm cursor-pointer backdrop-blur-md shadow-sm"
+              >
+                <ShieldCheck size={14} className="mr-1.5 text-zinc-600" />
+                <span>My Cases & Briefs</span>
+              </Button>
+            )}
           </div>
         </div>
 
