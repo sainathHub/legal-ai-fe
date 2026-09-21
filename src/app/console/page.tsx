@@ -47,6 +47,7 @@ import {
 } from '@/lib/api/types';
 import AuthDialog from '@/components/AuthDialog';
 import LegalOpinionViewer from '@/components/LegalOpinionViewer';
+import CitationsDialog from '@/components/CitationsDialog';
 
 export default function ConsolePage() {
   const router = useRouter();
@@ -67,7 +68,7 @@ export default function ConsolePage() {
   // Analysis & Results State
   const [analyzing, setAnalyzing] = useState(false);
   const [ragResult, setRagResult] = useState<LegalRAGResponse | null>(null);
-  const [activeResultSubTab, setActiveResultSubTab] = useState<'opinion' | 'precedents'>('opinion');
+  const [citationsModalOpen, setCitationsModalOpen] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [groqMissingNotice, setGroqMissingNotice] = useState<boolean>(false);
   const [fallbackPrecedents, setFallbackPrecedents] = useState<VectorSearchResultItem[]>([]);
@@ -198,7 +199,6 @@ export default function ConsolePage() {
       });
 
       setRagResult(response);
-      setActiveResultSubTab('opinion');
     } catch (err) {
       const errMsg = err instanceof ApiError ? err.message : String(err);
 
@@ -213,7 +213,7 @@ export default function ConsolePage() {
             alpha: searchMode === 'hybrid' ? 0.5 : searchMode === 'vector' ? 1.0 : 0.0,
           });
           setFallbackPrecedents(vRes.results || []);
-          setActiveResultSubTab('precedents');
+          setCitationsModalOpen(true);
         } catch {
           // Ignore secondary fallback error
         }
@@ -555,7 +555,7 @@ export default function ConsolePage() {
 
             {/* Groq API Key Missing Guidance Banner */}
             {groqMissingNotice && (
-              <div className="p-5 bg-amber-50 border border-amber-300 text-amber-900 rounded-2xl text-xs flex flex-col gap-2 animate-in fade-in">
+              <div className="p-5 bg-amber-50 border border-amber-300 text-amber-900 rounded-2xl text-xs flex flex-col gap-2.5 animate-in fade-in">
                 <div className="flex items-center gap-2 font-bold font-display text-sm">
                   <AlertCircle size={18} className="text-amber-700 shrink-0" />
                   <span>GROQ_API_KEY Required on Render Backend</span>
@@ -571,9 +571,21 @@ export default function ConsolePage() {
                     <li>Add <code>GROQ_API_KEY</code> with your key from <code>legal-ai-backend/.env</code>.</li>
                   </ol>
                 </div>
-                <span className="text-[11px] text-amber-700 mt-1">
-                  Retrieved precedents are shown below in the meantime.
-                </span>
+                {fallbackPrecedents.length > 0 && (
+                  <div className="pt-2 border-t border-amber-200/70 flex items-center justify-between flex-wrap gap-2">
+                    <span className="text-[11px] text-amber-800">
+                      {fallbackPrecedents.length} landmark precedent citations retrieved from Weaviate Cloud:
+                    </span>
+                    <Button
+                      size="sm"
+                      onClick={() => setCitationsModalOpen(true)}
+                      className="bg-amber-900 text-white hover:bg-amber-950 text-xs h-8 gap-1.5 cursor-pointer shadow-xs"
+                    >
+                      <BookOpen size={13} />
+                      <span>View Citations Popup ({fallbackPrecedents.length})</span>
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -595,129 +607,18 @@ export default function ConsolePage() {
               </div>
             )}
 
-            {/* Results Section */}
-            {!analyzing && (ragResult || displayedPrecedents.length > 0) && (
+            {/* Results Section: Uninterrupted Legal Advisory Opinion */}
+            {!analyzing && ragResult && (
               <div className="flex flex-col gap-4">
-                {/* Result Sub-Tab Switcher */}
-                <div className="flex items-center justify-between border-b border-black/10 pb-2">
-                  <div className="flex items-center gap-2">
-                    {ragResult && (
-                      <button
-                        onClick={() => setActiveResultSubTab('opinion')}
-                        className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
-                          activeResultSubTab === 'opinion'
-                            ? 'bg-black text-white shadow-xs'
-                            : 'bg-white text-zinc-600 border border-black/10 hover:border-black/30'
-                        }`}
-                      >
-                        <Sparkles size={13} className="text-amber-300" />
-                        <span>Judicial Advisory Opinion</span>
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => setActiveResultSubTab('precedents')}
-                      className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
-                        activeResultSubTab === 'precedents'
-                          ? 'bg-black text-white shadow-xs'
-                          : 'bg-white text-zinc-600 border border-black/10 hover:border-black/30'
-                      }`}
-                    >
-                      <BookOpen size={13} />
-                      <span>Cited Precedents ({displayedPrecedents.length})</span>
-                    </button>
-                  </div>
-
-                  <div className="text-[11px] font-mono text-zinc-500 hidden sm:block">
-                    {ragResult ? `Pipeline: ${ragResult.search_mode_used} • ${ragResult.execution_time_ms} ms` : 'Weaviate Precedent Matches'}
-                  </div>
-                </div>
-
-                {/* Sub-Tab 1: Legal Opinion Viewer */}
-                {activeResultSubTab === 'opinion' && ragResult && (
-                  <LegalOpinionViewer
-                    answer={ragResult.answer}
-                    query={ragResult.query}
-                    modelUsed={ragResult.model_used}
-                    executionTimeMs={ragResult.execution_time_ms}
-                    searchModeUsed={ragResult.search_mode_used}
-                    onSaveToThread={handlePinAnalysisToThread}
-                  />
-                )}
-
-                {/* Sub-Tab 2: Precedent Citation Cards */}
-                {activeResultSubTab === 'precedents' && (
-                  <div className="grid grid-cols-1 gap-4">
-                    {displayedPrecedents.map((item, index) => {
-                      const title = item.title || item.metadata?.case_title || 'Supreme Court / High Court Ruling';
-                      const court = item.metadata?.court_name || 'Apex Court of India';
-                      const date = item.metadata?.decision_date || item.metadata?.year || 'Precedent Archive';
-                      const sourceUrl = item.metadata?.source_url as string | undefined;
-
-                      return (
-                        <Card key={item.id || index} className="p-6 bg-white border-black/10 rounded-2xl shadow-xs hover:border-black/30 transition-all">
-                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-3">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                                <Badge className="bg-black text-white text-[10px] font-mono">
-                                  PRECEDENT #{index + 1}
-                                </Badge>
-                                {item.score !== undefined && item.score !== null && (
-                                  <Badge variant="outline" className="text-[10px] font-mono border-emerald-300 bg-emerald-50 text-emerald-800">
-                                    Score: {item.score.toFixed(4)}
-                                  </Badge>
-                                )}
-                                <span className="text-xs font-mono text-zinc-500">
-                                  {court} • {date}
-                                </span>
-                              </div>
-                              <h3 className="text-base font-bold text-black font-display">
-                                {title}
-                              </h3>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              {sourceUrl && (
-                                <a
-                                  href={sourceUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="p-2 border border-black/10 rounded-lg text-zinc-600 hover:text-black hover:bg-zinc-50 transition-colors"
-                                  title="Open Kanoon Source Document"
-                                >
-                                  <ExternalLink size={14} />
-                                </a>
-                              )}
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleCopyExtract(item.id, item.content || '')}
-                                className="text-xs rounded-lg border-black/15 text-zinc-700 hover:text-black"
-                              >
-                                {copiedExtractId === item.id ? (
-                                  <>
-                                    <Check size={13} className="text-emerald-600 mr-1" />
-                                    <span>Copied</span>
-                                  </>
-                                ) : (
-                                  <>
-                                    <Copy size={13} className="mr-1" />
-                                    <span>Extract</span>
-                                  </>
-                                )}
-                              </Button>
-                            </div>
-                          </div>
-
-                          {/* Quoted Extract */}
-                          <div className="bg-zinc-50 rounded-xl p-4 border border-black/5 text-xs text-zinc-800 leading-relaxed font-serif whitespace-pre-line">
-                            {item.content || item.title || (item.metadata && Object.keys(item.metadata).length > 0 ? JSON.stringify(item.metadata, null, 2) : `Precedent judgment chunk (${item.id}) indexed in Weaviate Cloud.`)}
-                          </div>
-                        </Card>
-                      );
-                    })}
-                  </div>
-                )}
+                <LegalOpinionViewer
+                  answer={ragResult.answer}
+                  query={ragResult.query}
+                  modelUsed={ragResult.model_used}
+                  executionTimeMs={ragResult.execution_time_ms}
+                  searchModeUsed={ragResult.search_mode_used}
+                  precedents={ragResult.precedents}
+                  onSaveToThread={handlePinAnalysisToThread}
+                />
               </div>
             )}
 
@@ -1072,6 +973,15 @@ export default function ConsolePage() {
           </div>
         </div>
       )}
+
+      {/* Citations Modal */}
+      <CitationsDialog
+        open={citationsModalOpen}
+        onOpenChange={setCitationsModalOpen}
+        precedents={displayedPrecedents}
+        searchMode={searchMode}
+        query={queryText}
+      />
 
       {/* Auth Dialog */}
       <AuthDialog

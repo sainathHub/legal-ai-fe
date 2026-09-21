@@ -4,6 +4,8 @@ import React, { useState } from 'react';
 import { Copy, Check, Printer, Sparkles, BookOpen, Scale, Lightbulb, FileText, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { VectorSearchResultItem } from '@/lib/api/types';
+import CitationsDialog from '@/components/CitationsDialog';
 
 interface LegalOpinionViewerProps {
   answer: string;
@@ -11,6 +13,7 @@ interface LegalOpinionViewerProps {
   modelUsed?: string;
   executionTimeMs?: number;
   searchModeUsed?: string;
+  precedents?: VectorSearchResultItem[];
   onSaveToThread?: (opinionText: string) => void;
 }
 
@@ -20,10 +23,12 @@ export default function LegalOpinionViewer({
   modelUsed = 'qwen/qwen3.8-27b',
   executionTimeMs,
   searchModeUsed = 'hybrid',
+  precedents = [],
   onSaveToThread,
 }: LegalOpinionViewerProps) {
   const [copied, setCopied] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [citationsOpen, setCitationsOpen] = useState(false);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(`LEGAL ADVISORY OPINION\nQuery: ${query}\n\n${answer}`);
@@ -136,7 +141,20 @@ export default function LegalOpinionViewer({
         </div>
 
         {/* Action Controls */}
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+          {/* Pop-up Citations Button */}
+          {precedents && precedents.length > 0 && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setCitationsOpen(true)}
+              className="text-xs h-8 border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100/80 text-emerald-900 font-semibold gap-1.5 cursor-pointer shadow-xs"
+            >
+              <BookOpen size={13} className="text-emerald-700" />
+              <span>Citations ({precedents.length})</span>
+            </Button>
+          )}
+
           {onSaveToThread && (
             <Button
               variant="outline"
@@ -209,6 +227,15 @@ export default function LegalOpinionViewer({
         <span>AI-assisted synthesis over Indian Supreme Court & High Court precedents. Always verify citations before court filing.</span>
         <span className="shrink-0 text-zinc-500">JURIS.AI • Neural Legal Intelligence</span>
       </div>
+
+      {/* Citations Popup Dialog */}
+      <CitationsDialog
+        open={citationsOpen}
+        onOpenChange={setCitationsOpen}
+        precedents={precedents}
+        searchMode={searchModeUsed}
+        query={query}
+      />
     </div>
   );
 }
