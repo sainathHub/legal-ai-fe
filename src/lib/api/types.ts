@@ -151,6 +151,7 @@ export interface LegalRAGResponse {
   precedents_count: number;
   precedents: VectorSearchResultItem[];
   search_mode_used: string;
+  standalone_query?: string | null;
   execution_time_ms: number;
 }
 
@@ -158,4 +159,24 @@ export interface LegalRAGModelInfo {
   default_model: string;
   supported_models: string[];
   groq_configured: boolean;
+}
+
+export interface ThreadMessage {
+  id: string;
+  thread_id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  sources?: Array<{
+    case_title?: string;
+    court_name?: string;
+    decision_date?: string;
+    case_type?: string;
+    influence_score?: number;
+    doc_url?: string;
+    score?: number;
+    distance?: number;
+    excerpt?: string;
+  }>;
+  tokens_used?: number | null;
+  created_at: string;
 }

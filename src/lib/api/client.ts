@@ -12,6 +12,7 @@ import {
   Thread,
   ThreadCreate,
   ThreadUpdate,
+  ThreadMessage,
   VectorSearchQuery,
   VectorSearchResponse,
   VectorStatus,
@@ -197,6 +198,12 @@ export const api = {
       }),
     delete: (threadId: string) =>
       request<void>(`/api/v1/threads/${threadId}`, {
+        method: 'DELETE',
+      }),
+    getMessages: (threadId: string) =>
+      request<ThreadMessage[]>(`/api/v1/threads/${threadId}/messages`),
+    clearMessages: (threadId: string) =>
+      request<void>(`/api/v1/threads/${threadId}/messages`, {
         method: 'DELETE',
       }),
   },
