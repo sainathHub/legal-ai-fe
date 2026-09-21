@@ -140,7 +140,7 @@ export default function Navbar({ onOpenAuth }: NavbarProps) {
                       type="text"
                       value={customHost}
                       onChange={(e) => setCustomHost(e.target.value)}
-                      placeholder="https://legal-ai-backend-75al.onrender.com"
+                      placeholder="http://localhost:8000"
                       className="flex-1 px-2 py-1 text-[11px] font-mono bg-zinc-50 border border-black/15 rounded-lg focus:outline-none focus:border-black"
                     />
                     <Button
@@ -152,7 +152,7 @@ export default function Navbar({ onOpenAuth }: NavbarProps) {
                     </Button>
                   </div>
                   <span className="block text-[9px] text-zinc-400 font-mono mt-1">
-                    Leave blank to restore default Render deployment.
+                    Leave blank to restore default host (http://localhost:8000).
                   </span>
                 </div>
               </div>
