@@ -4,12 +4,12 @@ import React, { useEffect, useRef, useState } from 'react';
 import {
   Sparkles, Scale, BookOpen, MessageSquare, Trash2, Plus,
   SendHorizonal, Loader2, Copy, Check, ChevronRight, FileText,
-  Lightbulb, Bot
+  Lightbulb, Bot, History, ChevronDown, Clock
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import CitationsDialog from '@/components/CitationsDialog';
-import { ConversationMessage, VectorSearchResultItem } from '@/lib/api/types';
+import { ConversationMessage, Thread, VectorSearchResultItem } from '@/lib/api/types';
 
 interface ConversationPanelProps {
   messages: ConversationMessage[];
@@ -20,6 +20,10 @@ interface ConversationPanelProps {
   onNewConversation: () => void;
   threadTitle?: string;
   searchMode?: string;
+  threads?: Thread[];
+  activeThreadId?: string | null;
+  onSelectThread?: (threadId: string) => void;
+  loadingMessages?: boolean;
 }
 
 function formatInline(text: string): string {
@@ -223,10 +227,30 @@ export default function ConversationPanel({
   onNewConversation,
   threadTitle,
   searchMode = 'hybrid',
+  threads = [],
+  activeThreadId,
+  onSelectThread,
+  loadingMessages = false,
 }: ConversationPanelProps) {
   const [inputText, setInputText] = useState('');
+  const [sessionsOpen, setSessionsOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setSessionsOpen(false);
+      }
+    }
+    if (sessionsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [sessionsOpen]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -261,25 +285,122 @@ export default function ConversationPanel({
       className="flex flex-col bg-white border border-black/10 rounded-2xl shadow-sm overflow-hidden"
       style={{ height: 'calc(100vh - 280px)', minHeight: '520px' }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-3.5 border-b border-black/10 bg-white shrink-0">
-        <div className="flex items-center gap-2.5">
-          <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center">
+      {/* Header with Interactive Thread Selector */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-black/10 bg-white shrink-0 relative">
+        <div className="flex items-center gap-2.5 min-w-0" ref={dropdownRef}>
+          <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
             <MessageSquare size={14} />
           </div>
-          <div>
-            <p className="text-xs font-bold font-display uppercase tracking-wider text-black">
-              {threadTitle ?? 'Research Session'}
-            </p>
-            <p className="text-[10px] font-mono text-zinc-400">
-              {hasMessages
-                ? `${messages.length} turn${messages.length !== 1 ? 's' : ''}`
-                : 'Ask a legal question to begin'}{' '}
-              • LangChain multi-turn
-            </p>
+
+          <div className="relative min-w-0">
+            <button
+              type="button"
+              onClick={() => setSessionsOpen(!sessionsOpen)}
+              className="flex items-center gap-1.5 text-left hover:bg-zinc-50 px-2 py-1 -ml-2 rounded-lg transition-colors group cursor-pointer max-w-full"
+            >
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <p className="text-xs font-bold font-display uppercase tracking-wider text-black truncate max-w-[200px] sm:max-w-[320px]">
+                    {threadTitle || 'Research Session'}
+                  </p>
+                  <ChevronDown
+                    size={12}
+                    className={`text-zinc-400 group-hover:text-black transition-transform shrink-0 ${
+                      sessionsOpen ? 'rotate-180' : ''
+                    }`}
+                  />
+                </div>
+                <p className="text-[10px] font-mono text-zinc-400">
+                  {hasMessages
+                    ? `${messages.length} turn${messages.length !== 1 ? 's' : ''}`
+                    : 'Ask a legal question to begin'}{' '}
+                  • {threads && threads.length > 0 ? `${threads.length} saved session${threads.length !== 1 ? 's' : ''}` : 'PostgreSQL synced'}
+                </p>
+              </div>
+            </button>
+
+            {/* Sessions Dropdown Menu */}
+            {sessionsOpen && (
+              <div className="absolute top-full left-0 mt-1.5 w-84 max-w-[90vw] bg-white border border-black/15 rounded-xl shadow-xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
+                <div className="p-3 border-b border-black/10 bg-zinc-50 flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-[11px] font-mono font-semibold text-zinc-700">
+                    <History size={13} className="text-indigo-600" />
+                    <span>Saved Research Sessions</span>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => {
+                      setSessionsOpen(false);
+                      onNewConversation();
+                    }}
+                    className="h-6 px-2 text-[10px] font-mono text-indigo-700 hover:bg-indigo-50 gap-1"
+                  >
+                    <Plus size={10} />
+                    <span>New</span>
+                  </Button>
+                </div>
+
+                <div className="max-h-64 overflow-y-auto p-1.5 space-y-1">
+                  {threads && threads.length > 0 ? (
+                    threads.map((thr) => {
+                      const isActive = thr.id === activeThreadId;
+                      return (
+                        <button
+                          key={thr.id}
+                          onClick={() => {
+                            setSessionsOpen(false);
+                            onSelectThread?.(thr.id);
+                          }}
+                          className={`w-full text-left p-2 rounded-lg text-xs transition-colors flex items-center justify-between gap-2 cursor-pointer ${
+                            isActive
+                              ? 'bg-indigo-50 border border-indigo-200/80 text-indigo-950 font-semibold'
+                              : 'hover:bg-zinc-50 text-zinc-800'
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-xs">{thr.title}</p>
+                            <p className="text-[10px] font-mono text-zinc-400 mt-0.5 flex items-center gap-1">
+                              <Clock size={9} />
+                              {new Date(thr.created_at).toLocaleDateString([], {
+                                month: 'short',
+                                day: 'numeric',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })}
+                            </p>
+                          </div>
+                          {isActive && <Check size={14} className="text-indigo-600 shrink-0" />}
+                        </button>
+                      );
+                    })
+                  ) : (
+                    <div className="p-4 text-center text-zinc-400 text-xs font-mono">
+                      No saved threads yet.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </div>
         </div>
+
         <div className="flex items-center gap-2">
+          {threads && threads.length > 1 && (
+            <button
+              type="button"
+              onClick={() => setSessionsOpen(!sessionsOpen)}
+              className="h-7 px-2 text-[11px] font-mono border border-black/10 rounded-lg text-zinc-600 hover:text-black hover:bg-zinc-50 flex items-center gap-1 cursor-pointer transition-colors"
+              title="View all saved research sessions"
+            >
+              <History size={12} className="text-indigo-600" />
+              <span className="hidden sm:inline">Sessions</span>
+              <span className="bg-zinc-100 text-zinc-700 px-1.5 py-0.5 rounded-full text-[9px] font-bold">
+                {threads.length}
+              </span>
+            </button>
+          )}
+
           {hasMessages && (
             <Button
               variant="outline"
@@ -289,9 +410,10 @@ export default function ConversationPanel({
               title="Clear all messages in this conversation"
             >
               <Trash2 size={11} />
-              <span>Clear</span>
+              <span className="hidden sm:inline">Clear</span>
             </Button>
           )}
+
           <Button
             variant="outline"
             size="sm"
@@ -300,14 +422,23 @@ export default function ConversationPanel({
             title="Start a fresh conversation"
           >
             <Plus size={11} />
-            <span>New</span>
+            <span>New Session</span>
           </Button>
         </div>
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-5 py-5 space-y-5 scroll-smooth">
-        {!hasMessages && !isStreaming && (
+        {loadingMessages && (
+          <div className="flex flex-col items-center justify-center h-full text-center gap-3 py-16">
+            <Loader2 size={24} className="animate-spin text-indigo-600" />
+            <span className="text-xs font-mono text-zinc-500">
+              Loading conversation history from PostgreSQL…
+            </span>
+          </div>
+        )}
+
+        {!loadingMessages && !hasMessages && !isStreaming && (
           <div className="flex flex-col items-center justify-center h-full text-center gap-4 py-12">
             <div className="w-14 h-14 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center">
               <Scale size={26} className="text-indigo-400" />
@@ -339,14 +470,15 @@ export default function ConversationPanel({
           </div>
         )}
 
-        {messages.map((msg) => (
-          <MessageBubble
-            key={msg.id}
-            message={msg}
-            searchMode={searchMode}
-            streamingStatus={streamingStatus}
-          />
-        ))}
+        {!loadingMessages &&
+          messages.map((msg) => (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              searchMode={searchMode}
+              streamingStatus={streamingStatus}
+            />
+          ))}
 
         {/* Streaming status indicator before first token arrives */}
         {isStreaming && streamingStatus && messages[messages.length - 1]?.role === 'user' && (

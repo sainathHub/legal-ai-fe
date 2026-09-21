@@ -77,9 +77,13 @@ export default function ConsolePage() {
   const [copiedExtractId, setCopiedExtractId] = useState<string | null>(null);
 
   // Multi-turn Conversation State
+  const STORAGE_KEY_ACTIVE_THREAD = 'legal_ai_active_thread_id';
+
   const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([]);
   const [conversationThreadId, setConversationThreadId] = useState<string | null>(null);
   const [conversationThreadTitle, setConversationThreadTitle] = useState<string>('');
+  const [availableThreads, setAvailableThreads] = useState<Thread[]>([]);
+  const [loadingThreadMessages, setLoadingThreadMessages] = useState<boolean>(false);
   const [isStreaming, setIsStreaming] = useState(false);
   const [streamingStatus, setStreamingStatus] = useState<string>('');
   const abortControllerRef = React.useRef<AbortController | null>(null);
@@ -129,37 +133,95 @@ export default function ConsolePage() {
     },
   ];
 
-  // Load Projects from PostgreSQL
+  // ─── Load Thread Messages from PostgreSQL ──────────────────────────────────
+  const loadThreadMessages = useCallback(async (threadId: string) => {
+    setLoadingThreadMessages(true);
+    try {
+      const dbMsgs = await api.threads.getMessages(threadId);
+      const mapped: ConversationMessage[] = dbMsgs.map((m) => ({
+        id: m.id,
+        role: m.role as 'user' | 'assistant',
+        content: m.content,
+        created_at: m.created_at,
+        tokens_used: m.tokens_used,
+        precedents: (m.sources || []).map((s: Record<string, unknown>, idx: number) => ({
+          id: String(s.id || `src-${idx}`),
+          title: String(s.case_title || s.title || 'Judicial Precedent'),
+          content: String(s.chunk_text || s.content || ''),
+          metadata: {
+            case_title: String(s.case_title || s.title || ''),
+            court_name: String(s.court_name || ''),
+            case_type: String(s.case_type || ''),
+            decision_date: String(s.decision_date || ''),
+            source_url: String(s.doc_url || s.source_url || ''),
+            influence_score: typeof s.influence_score === 'number' ? s.influence_score : undefined,
+          },
+          score: typeof s.score === 'number' ? s.score : undefined,
+        })),
+      }));
+      setConversationMessages(mapped);
+    } catch (err) {
+      console.error('Failed to load thread messages from PostgreSQL', err);
+    } finally {
+      setLoadingThreadMessages(false);
+    }
+  }, []);
+
+  // ─── Load Project Details with Threads & Hydrate Active Thread ───────────
+  const loadProjectDetails = useCallback(
+    async (projectId: string, preferThreadId?: string) => {
+      try {
+        const detail = await api.projects.get(projectId);
+        setActiveProject(detail);
+        const threadsList = detail.threads || [];
+        setAvailableThreads(threadsList);
+
+        if (threadsList.length > 0) {
+          const savedThreadId =
+            preferThreadId ||
+            (typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_ACTIVE_THREAD) : null);
+          const chosenThread =
+            (savedThreadId ? threadsList.find((t) => t.id === savedThreadId) : null) ||
+            threadsList[threadsList.length - 1];
+
+          setActiveThread(chosenThread);
+          setConversationThreadId(chosenThread.id);
+          setConversationThreadTitle(chosenThread.title);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem(STORAGE_KEY_ACTIVE_THREAD, chosenThread.id);
+          }
+          await loadThreadMessages(chosenThread.id);
+        } else {
+          setActiveThread(null);
+          setConversationThreadId(null);
+          setConversationThreadTitle('');
+          setConversationMessages([]);
+        }
+      } catch (err) {
+        console.error('Failed to load project details', err);
+      }
+    },
+    [loadThreadMessages],
+  );
+
+  // ─── Load Projects from PostgreSQL ─────────────────────────────────────────
   const loadProjects = useCallback(async () => {
     if (!isAuthenticated) return;
     setLoadingProjects(true);
     try {
       const data = await api.projects.list();
       setProjects(data);
-      if (data.length > 0 && !activeProject) {
-        loadProjectDetails(data[0].id);
+      if (data.length > 0) {
+        const savedThreadId =
+          typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY_ACTIVE_THREAD) : null;
+        await loadProjectDetails(data[0].id, savedThreadId || undefined);
       }
     } catch (err) {
       console.error('Failed to fetch projects', err);
     } finally {
       setLoadingProjects(false);
     }
-  }, [isAuthenticated, activeProject]);
-
-  // Load Project Details with Threads
-  const loadProjectDetails = async (projectId: string) => {
-    try {
-      const detail = await api.projects.get(projectId);
-      setActiveProject(detail);
-      if (detail.threads && detail.threads.length > 0) {
-        setActiveThread(detail.threads[0]);
-      } else {
-        setActiveThread(null);
-      }
-    } catch (err) {
-      console.error('Failed to load project details', err);
-    }
-  };
+  }, [isAuthenticated, loadProjectDetails]);
 
   // Load Diagnostics & Models
   const loadDiagnostics = useCallback(async () => {
@@ -185,6 +247,19 @@ export default function ConsolePage() {
     loadDiagnostics();
   }, [isAuthenticated, loadProjects, loadDiagnostics]);
 
+  // ─── Switch Active Conversation Thread ────────────────────────────────────
+  const handleSelectConversationThread = async (threadId: string) => {
+    if (threadId === conversationThreadId) return;
+    const thr = availableThreads.find((t) => t.id === threadId);
+    setConversationThreadId(threadId);
+    setConversationThreadTitle(thr?.title || 'Research Session');
+    setActiveThread(thr || null);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_THREAD, threadId);
+    }
+    await loadThreadMessages(threadId);
+  };
+
   // ─── Create or reuse a session thread for conversations ───────────────────
   const ensureConversationThread = async (): Promise<string> => {
     if (conversationThreadId) return conversationThreadId;
@@ -203,6 +278,11 @@ export default function ConsolePage() {
     const newThread = await api.threads.create(projectId, { title: sessionTitle });
     setConversationThreadId(newThread.id);
     setConversationThreadTitle(sessionTitle);
+    setActiveThread(newThread);
+    setAvailableThreads((prev) => [newThread, ...prev.filter((t) => t.id !== newThread.id)]);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_KEY_ACTIVE_THREAD, newThread.id);
+    }
     return newThread.id;
   };
 
@@ -396,12 +476,17 @@ export default function ConsolePage() {
 
   // Reset to brand-new conversation (new thread)
   const handleNewConversation = () => {
+    if (isStreaming) return;
     setConversationMessages([]);
     setConversationThreadId(null);
-    setConversationThreadTitle('');
+    setConversationThreadTitle('New Research Session');
+    setActiveThread(null);
     setRagResult(null);
     setSearchError(null);
     setGroqMissingNotice(false);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem(STORAGE_KEY_ACTIVE_THREAD);
+    }
   };
 
   // Pin Analysis to Active Case Thread
@@ -456,6 +541,13 @@ export default function ConsolePage() {
       };
       setActiveProject(updatedProject);
       setActiveThread(newThr);
+      setAvailableThreads((prev) => [newThr, ...prev.filter((t) => t.id !== newThr.id)]);
+      setConversationThreadId(newThr.id);
+      setConversationThreadTitle(newThr.title);
+      setConversationMessages([]);
+      if (typeof window !== 'undefined') {
+        localStorage.setItem(STORAGE_KEY_ACTIVE_THREAD, newThr.id);
+      }
       setNewThreadTitle('');
     } catch (err) {
       console.error('Error creating thread', err);
@@ -778,6 +870,10 @@ export default function ConsolePage() {
               onNewConversation={handleNewConversation}
               threadTitle={conversationThreadTitle || undefined}
               searchMode={searchMode}
+              threads={availableThreads}
+              activeThreadId={conversationThreadId}
+              onSelectThread={handleSelectConversationThread}
+              loadingMessages={loadingThreadMessages}
             />
           </div>
         )}
@@ -899,7 +995,10 @@ export default function ConsolePage() {
                           {activeProject.threads.map((thr) => (
                             <button
                               key={thr.id}
-                              onClick={() => setActiveThread(thr)}
+                              onClick={() => {
+                                setActiveThread(thr);
+                                handleSelectConversationThread(thr.id);
+                              }}
                               className={`px-3.5 py-1.5 rounded-lg text-xs font-medium whitespace-nowrap cursor-pointer transition-all border ${
                                 activeThread?.id === thr.id
                                   ? 'bg-zinc-900 text-white border-zinc-900 shadow-xs'
@@ -914,8 +1013,22 @@ export default function ConsolePage() {
                         {/* Thread Drafting Workspace */}
                         {activeThread && (
                           <div className="bg-zinc-50 rounded-xl p-4 border border-black/10 flex flex-col gap-3">
-                            <div className="flex items-center justify-between text-xs font-mono text-zinc-500">
-                              <span>Active Thread: <strong>{activeThread.title}</strong></span>
+                            <div className="flex items-center justify-between text-xs font-mono text-zinc-500 flex-wrap gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span>Active Thread: <strong>{activeThread.title}</strong></span>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => {
+                                    setActiveTab('rag');
+                                    handleSelectConversationThread(activeThread.id);
+                                  }}
+                                  className="h-6 text-[10px] gap-1 border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-800 cursor-pointer font-medium"
+                                >
+                                  <MessageSquare size={10} />
+                                  <span>Chat in AI Advisory &rarr;</span>
+                                </Button>
+                              </div>
                               <span>Session saved to PostgreSQL</span>
                             </div>
 
