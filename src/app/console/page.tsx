@@ -22,10 +22,13 @@ import {
   Server,
   RefreshCw,
   Clock,
-  Send,
-  Layers,
   Sparkles,
-  Scale
+  Scale,
+  BookOpen,
+  SlidersHorizontal,
+  Info,
+  ChevronRight,
+  Pin
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,9 +41,12 @@ import {
   ProjectDetail, 
   Thread, 
   VectorSearchResultItem, 
-  VectorStatus 
+  VectorStatus,
+  LegalRAGResponse,
+  LegalRAGModelInfo
 } from '@/lib/api/types';
 import AuthDialog from '@/components/AuthDialog';
+import LegalOpinionViewer from '@/components/LegalOpinionViewer';
 
 export default function ConsolePage() {
   const router = useRouter();
@@ -49,23 +55,23 @@ export default function ConsolePage() {
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'rag' | 'projects' | 'diagnostics'>('rag');
 
-  // Precedent RAG State
-  const [searchQuery, setSearchQuery] = useState('Right to privacy under Article 21 and digital surveillance');
-  const [searchLimit, setSearchLimit] = useState<number>(5);
-  const [searchAlpha, setSearchAlpha] = useState<number>(0.0);
-  const [searching, setSearching] = useState(false);
-  const [searchResults, setSearchResults] = useState<VectorSearchResultItem[]>([]);
-  const [totalResults, setTotalResults] = useState<number>(0);
-  const [searchError, setSearchError] = useState<string | null>(null);
-  const [searchNotice, setSearchNotice] = useState<string | null>(null);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  // Legal RAG & Advisory State
+  const [queryText, setQueryText] = useState('Principles for grant of anticipatory bail under Section 438 CrPC and arbitrary arrest guidelines');
+  const [searchLimit, setSearchLimit] = useState<number>(4);
+  const [searchMode, setSearchMode] = useState<'hybrid' | 'vector' | 'bm25'>('hybrid');
+  const [selectedModel, setSelectedModel] = useState<string>('qwen/qwen3.8-27b');
+  const [caseTypeFilter, setCaseTypeFilter] = useState<string>('');
+  const [minYearFilter, setMinYearFilter] = useState<number>(0);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
-  // AI Legal Advisory Opinion State
-  const [advisoryOpinion, setAdvisoryOpinion] = useState<string | null>(null);
-  const [generatingOpinion, setGeneratingOpinion] = useState(false);
-  const [opinionModel, setOpinionModel] = useState<string | null>(null);
-  const [opinionLatency, setOpinionLatency] = useState<number | null>(null);
-  const [opinionCopied, setOpinionCopied] = useState(false);
+  // Analysis & Results State
+  const [analyzing, setAnalyzing] = useState(false);
+  const [ragResult, setRagResult] = useState<LegalRAGResponse | null>(null);
+  const [activeResultSubTab, setActiveResultSubTab] = useState<'opinion' | 'precedents'>('opinion');
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const [groqMissingNotice, setGroqMissingNotice] = useState<boolean>(false);
+  const [fallbackPrecedents, setFallbackPrecedents] = useState<VectorSearchResultItem[]>([]);
+  const [copiedExtractId, setCopiedExtractId] = useState<string | null>(null);
 
   // Projects / Cases State
   const [projects, setProjects] = useState<Project[]>([]);
@@ -81,21 +87,38 @@ export default function ConsolePage() {
   const [creatingThread, setCreatingThread] = useState(false);
   const [activeThread, setActiveThread] = useState<Thread | null>(null);
   const [threadNotes, setThreadNotes] = useState<string>('');
+  const [pinnedNotice, setPinnedNotice] = useState<string | null>(null);
 
-  // Vector Diagnostics State
+  // Diagnostics State
   const [vectorStatus, setVectorStatus] = useState<VectorStatus | null>(null);
-  const [loadingVectorStatus, setLoadingVectorStatus] = useState(false);
+  const [ragModelInfo, setRagModelInfo] = useState<LegalRAGModelInfo | null>(null);
+  const [loadingDiagnostics, setLoadingDiagnostics] = useState(false);
 
-  // Suggested search queries for Indian advocates
-  const suggestedQueries = [
-    'Right to privacy under Article 21 and digital surveillance',
-    'Moratorium under Section 14 IBC and personal guarantors',
-    'Principles for grant of anticipatory bail under Section 438 CrPC',
-    'Scope of interference with arbitral awards under Section 34 of Arbitration Act',
-    'Basic Structure Doctrine and constitutional amendment powers under Article 368',
+  // Curated Landmark Queries for Indian Advocates
+  const landmarkQueries = [
+    {
+      title: 'Anticipatory Bail (438 CrPC)',
+      query: 'Principles for grant of anticipatory bail under Section 438 CrPC and arbitrary arrest safeguards',
+    },
+    {
+      title: 'Article 21 Privacy & Surveillance',
+      query: 'Right to privacy under Article 21 and digital surveillance proportional interference standards',
+    },
+    {
+      title: 'IBC Section 14 Moratorium',
+      query: 'Moratorium under Section 14 IBC and personal guarantors liability under Indian Contract Act',
+    },
+    {
+      title: 'Arbitration Award (Section 34)',
+      query: 'Scope of patent illegality and public policy grounds for setting aside arbitral award under Section 34',
+    },
+    {
+      title: 'FIR Quashing (482 CrPC Bhajan Lal)',
+      query: 'Guidelines for quashing of criminal FIR under Section 482 CrPC pursuant to State of Haryana v Bhajan Lal',
+    },
   ];
 
-  // Fetch projects list
+  // Load Projects from PostgreSQL
   const loadProjects = useCallback(async () => {
     if (!isAuthenticated) return;
     setLoadingProjects(true);
@@ -112,7 +135,7 @@ export default function ConsolePage() {
     }
   }, [isAuthenticated, activeProject]);
 
-  // Fetch project details with threads
+  // Load Project Details with Threads
   const loadProjectDetails = async (projectId: string) => {
     try {
       const detail = await api.projects.get(projectId);
@@ -127,119 +150,97 @@ export default function ConsolePage() {
     }
   };
 
-  // Fetch Vector store status
-  const loadVectorStatus = useCallback(async () => {
-    setLoadingVectorStatus(true);
+  // Load Diagnostics & Models
+  const loadDiagnostics = useCallback(async () => {
+    setLoadingDiagnostics(true);
     try {
-      const status = await api.vectors.status();
-      setVectorStatus(status);
+      const [vStatus, mInfo] = await Promise.allSettled([
+        api.vectors.status(),
+        isAuthenticated ? api.rag.models() : Promise.resolve(null),
+      ]);
+      if (vStatus.status === 'fulfilled') setVectorStatus(vStatus.value);
+      if (mInfo.status === 'fulfilled' && mInfo.value) setRagModelInfo(mInfo.value);
     } catch (err) {
-      console.error('Failed to fetch vector status', err);
+      console.error('Failed to load diagnostics', err);
     } finally {
-      setLoadingVectorStatus(false);
+      setLoadingDiagnostics(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
     if (isAuthenticated) {
       loadProjects();
     }
-    loadVectorStatus();
-  }, [isAuthenticated, loadProjects, loadVectorStatus]);
+    loadDiagnostics();
+  }, [isAuthenticated, loadProjects, loadDiagnostics]);
 
-  // Execute Vector Precedent Search
-  const handleSearch = async (queryText: string = searchQuery, overrideAlpha?: number) => {
-    if (!queryText.trim()) return;
-    setSearching(true);
+  // Main Action: Run Legal RAG & LLM Analysis
+  const handleRunAnalysis = async (queryInput: string = queryText) => {
+    if (!queryInput.trim()) return;
+    setAnalyzing(true);
     setSearchError(null);
-    setSearchNotice(null);
+    setGroqMissingNotice(false);
 
-    // If not authenticated, prompt user
     if (!isAuthenticated) {
-      setSearching(false);
+      setAnalyzing(false);
       setAuthModalOpen(true);
       return;
     }
 
-    const currentAlpha = overrideAlpha !== undefined ? overrideAlpha : searchAlpha;
-
     try {
-      const res = await api.vectors.search({
-        query: queryText.trim(),
+      const response = await api.rag.query({
+        query: queryInput.trim(),
         limit: searchLimit,
-        alpha: currentAlpha,
+        search_mode: searchMode,
+        model: selectedModel,
+        case_type: caseTypeFilter || null,
+        min_year: minYearFilter > 0 ? minYearFilter : undefined,
       });
-      setSearchResults(res.results || []);
-      setTotalResults(res.total_results || 0);
+
+      setRagResult(response);
+      setActiveResultSubTab('opinion');
     } catch (err) {
       const errMsg = err instanceof ApiError ? err.message : String(err);
-      
-      // If collection does not have vectorizer configured on cloud, fallback to BM25 keyword search
-      if (errMsg.includes('without vectorizer') && currentAlpha > 0) {
+
+      // Check if Groq API key is missing on the server
+      if (errMsg.includes('GROQ_API_KEY is not configured')) {
+        setGroqMissingNotice(true);
+        // Fall back to querying precedents so advocate still gets vector results
         try {
-          const fallbackRes = await api.vectors.search({
-            query: queryText.trim(),
+          const vRes = await api.vectors.search({
+            query: queryInput.trim(),
             limit: searchLimit,
-            alpha: 0.0,
+            alpha: searchMode === 'hybrid' ? 0.5 : searchMode === 'vector' ? 1.0 : 0.0,
           });
-          setSearchAlpha(0.0);
-          setSearchResults(fallbackRes.results || []);
-          setTotalResults(fallbackRes.total_results || 0);
-          setSearchNotice('Weaviate Cloud collection does not have a vectorizer enabled; automatically routed query through BM25 keyword index.');
-          return;
-        } catch (fallbackErr) {
-          setSearchError(fallbackErr instanceof ApiError ? fallbackErr.message : 'Search failed.');
+          setFallbackPrecedents(vRes.results || []);
+          setActiveResultSubTab('precedents');
+        } catch {
+          // Ignore secondary fallback error
         }
       } else {
         setSearchError(errMsg);
       }
     } finally {
-      setSearching(false);
+      setAnalyzing(false);
     }
   };
 
-  // Formulate AI Legal Advisory Opinion using Weaviate Cloud + Groq LLM
-  const handleGenerateOpinion = async (queryText: string = searchQuery) => {
-    if (!queryText.trim()) return;
-    setGeneratingOpinion(true);
-    setSearchError(null);
-    setSearchNotice(null);
-
-    if (!isAuthenticated) {
-      setGeneratingOpinion(false);
-      setAuthModalOpen(true);
+  // Pin Analysis to Active Case Thread
+  const handlePinAnalysisToThread = (opinionText: string) => {
+    if (!activeProject) {
+      alert('Please create or select a case in the "Case Files" tab first to pin this opinion.');
       return;
     }
 
-    try {
-      const res = await api.rag.query({
-        query: queryText.trim(),
-        limit: searchLimit,
-        search_mode: searchAlpha > 0 ? "hybrid" : "bm25",
-      });
-      setAdvisoryOpinion(res.answer);
-      setOpinionModel(res.model_used);
-      setOpinionLatency(res.execution_time_ms);
-      if (res.precedents && res.precedents.length > 0) {
-        setSearchResults(res.precedents);
-        setTotalResults(res.precedents_count);
-      }
-    } catch (err) {
-      const errMsg = err instanceof ApiError ? err.message : String(err);
-      setSearchError(`AI Advisory generation error: ${errMsg}`);
-    } finally {
-      setGeneratingOpinion(false);
-    }
+    const timestamp = new Date().toLocaleString();
+    const pinContent = `\n\n--- PINNED ADVISORY OPINION (${timestamp}) ---\nQuery: ${ragResult?.query || queryText}\n\n${opinionText}\n`;
+    setThreadNotes((prev) => (prev ? prev + pinContent : pinContent));
+
+    setPinnedNotice(`Pinned to ${activeProject.title}! View in "Case Files" tab.`);
+    setTimeout(() => setPinnedNotice(null), 3500);
   };
 
-  const handleCopyOpinion = () => {
-    if (!advisoryOpinion) return;
-    navigator.clipboard.writeText(advisoryOpinion);
-    setOpinionCopied(true);
-    setTimeout(() => setOpinionCopied(false), 2000);
-  };
-
-  // Create New Case Project
+  // Create New Project Case
   const handleCreateCase = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newCaseTitle.trim()) return;
@@ -261,7 +262,7 @@ export default function ConsolePage() {
     }
   };
 
-  // Create New Thread inside active project
+  // Create New Thread in Project
   const handleCreateThread = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!activeProject || !newThreadTitle.trim()) return;
@@ -284,12 +285,14 @@ export default function ConsolePage() {
     }
   };
 
-  // Copy citation extract
-  const handleCopy = (id: string, text: string) => {
+  // Copy Precedent Extract
+  const handleCopyExtract = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
-    setCopiedId(id);
-    setTimeout(() => setCopiedId(null), 2000);
+    setCopiedExtractId(id);
+    setTimeout(() => setCopiedExtractId(null), 2000);
   };
+
+  const displayedPrecedents = ragResult?.precedents || fallbackPrecedents;
 
   return (
     <div className="min-h-screen bg-zinc-50 text-black flex flex-col font-sans">
@@ -310,12 +313,12 @@ export default function ConsolePage() {
                 JURIS.AI
               </span>
               <Badge variant="outline" className="text-[10px] font-mono border-black/15 bg-black/5 text-zinc-700">
-                RESEARCH CONSOLE
+                LEGAL RESEARCH & ADVISORY CONSOLE
               </Badge>
             </div>
           </div>
 
-          {/* Center Tabs */}
+          {/* Center Main Tabs */}
           <div className="hidden md:flex items-center gap-1 bg-zinc-100 p-1 rounded-full border border-black/10">
             <button
               onClick={() => setActiveTab('rag')}
@@ -325,8 +328,8 @@ export default function ConsolePage() {
                   : 'text-zinc-600 hover:text-black'
               }`}
             >
-              <Search size={13} />
-              <span>Precedent Vector RAG</span>
+              <Sparkles size={13} className="text-amber-300" />
+              <span>AI Legal Advisory</span>
             </button>
             <button
               onClick={() => setActiveTab('projects')}
@@ -352,7 +355,7 @@ export default function ConsolePage() {
             </button>
           </div>
 
-          {/* Right: Auth Profile / Sign In */}
+          {/* Right: Advocate Profile & Session */}
           <div className="flex items-center gap-3">
             {isAuthenticated && user ? (
               <div className="flex items-center gap-2">
@@ -384,131 +387,165 @@ export default function ConsolePage() {
         </div>
       </header>
 
+      {/* Pinned Notification Toast */}
+      {pinnedNotice && (
+        <div className="fixed bottom-6 right-6 z-50 bg-black text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2.5 text-xs animate-in fade-in slide-in-from-bottom-2">
+          <CheckCircle2 size={16} className="text-emerald-400" />
+          <span>{pinnedNotice}</span>
+        </div>
+      )}
+
       {/* Main Console Canvas */}
       <main className="flex-1 max-w-7xl mx-auto w-full p-6">
-        {/* Tab 1: Precedent Semantic RAG */}
+        {/* Tab 1: AI Legal Advisory & Analysis */}
         {activeTab === 'rag' && (
           <div className="flex flex-col gap-6">
-            {/* Search Header Banner */}
+            {/* Search / Query Input Banner */}
             <div className="bg-white border border-black/10 rounded-2xl p-6 shadow-xs">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-4">
                 <div>
                   <h2 className="text-xl font-bold text-black font-display tracking-tight flex items-center gap-2">
-                    <span>Indian Jurisprudence Semantic Search</span>
-                    <Badge variant="outline" className="text-[10px] font-mono border-emerald-300 bg-emerald-50 text-emerald-700">
-                      Weaviate Cloud Live
+                    <span>Indian Judicial Advisory & Precedent Analysis</span>
+                    <Badge variant="outline" className="text-[10px] font-mono border-emerald-300 bg-emerald-50 text-emerald-800">
+                      Weaviate Cloud + Groq LLM
                     </Badge>
                   </h2>
                   <p className="text-xs text-zinc-600 mt-1">
-                    Execute high-dimensional cosine similarity searches across indexed Supreme Court & High Court precedents.
+                    Enter facts, statutory sections, or case propositions to formulate an authoritative legal opinion backed by landmark Supreme Court & High Court rulings.
                   </p>
                 </div>
 
-                {/* Hybrid Search Controls */}
-                <div className="flex items-center gap-4 text-xs font-mono text-zinc-600 bg-zinc-50 border border-black/10 px-3 py-2 rounded-xl">
-                  <div className="flex items-center gap-2">
-                    <Sliders size={13} />
-                    <span>Hybrid Alpha: <strong>{searchAlpha}</strong></span>
-                    <input
-                      type="range"
-                      min="0"
-                      max="1"
-                      step="0.05"
-                      value={searchAlpha}
-                      onChange={(e) => setSearchAlpha(parseFloat(e.target.value))}
-                      className="w-20 accent-black cursor-pointer"
-                      title="0 = BM25 keyword only, 1 = Vector semantic only"
-                    />
+                {/* Advanced Filter Toggle */}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                  className="text-xs rounded-xl border-black/15 gap-1.5 self-end sm:self-auto"
+                >
+                  <SlidersHorizontal size={13} />
+                  <span>{showAdvancedFilters ? 'Hide Parameters' : 'RAG Parameters'}</span>
+                </Button>
+              </div>
+
+              {/* Advanced Parameters Drawer */}
+              {showAdvancedFilters && (
+                <div className="mb-4 p-4 rounded-xl bg-zinc-50 border border-black/10 grid grid-cols-1 sm:grid-cols-4 gap-4 text-xs font-mono animate-in fade-in">
+                  <div>
+                    <label className="block text-[10px] text-zinc-500 uppercase tracking-wider mb-1">
+                      Retrieval Strategy
+                    </label>
+                    <select
+                      value={searchMode}
+                      onChange={(e) => setSearchMode(e.target.value as any)}
+                      className="w-full bg-white border border-black/15 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+                    >
+                      <option value="hybrid">Hybrid (Vector + BM25)</option>
+                      <option value="vector">MiniLM Semantic Vector</option>
+                      <option value="bm25">BM25 Keyword Search</option>
+                    </select>
                   </div>
-                  <span className="text-zinc-300">|</span>
-                  <div className="flex items-center gap-1.5">
-                    <span>Limit:</span>
+
+                  <div>
+                    <label className="block text-[10px] text-zinc-500 uppercase tracking-wider mb-1">
+                      Precedents Limit
+                    </label>
                     <select
                       value={searchLimit}
                       onChange={(e) => setSearchLimit(parseInt(e.target.value))}
-                      className="bg-white border border-black/15 rounded px-1.5 py-0.5 text-xs font-mono focus:outline-none"
+                      className="w-full bg-white border border-black/15 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
                     >
-                      <option value={3}>3</option>
-                      <option value={5}>5</option>
-                      <option value={10}>10</option>
-                      <option value={15}>15</option>
+                      <option value={2}>2 Precedents</option>
+                      <option value={4}>4 Precedents (Default)</option>
+                      <option value={6}>6 Precedents</option>
+                      <option value={8}>8 Precedents</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-zinc-500 uppercase tracking-wider mb-1">
+                      Synthesis Model
+                    </label>
+                    <select
+                      value={selectedModel}
+                      onChange={(e) => setSelectedModel(e.target.value)}
+                      className="w-full bg-white border border-black/15 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+                    >
+                      <option value="qwen/qwen3.8-27b">Qwen 3.8-27B (Recommended)</option>
+                      <option value="openai/gpt-oss-120b">GPT-OSS 120B</option>
+                      <option value="openai/gpt-oss-20b">GPT-OSS 20B</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] text-zinc-500 uppercase tracking-wider mb-1">
+                      Case Type Filter
+                    </label>
+                    <select
+                      value={caseTypeFilter}
+                      onChange={(e) => setCaseTypeFilter(e.target.value)}
+                      className="w-full bg-white border border-black/15 rounded-lg px-2 py-1.5 text-xs focus:outline-none"
+                    >
+                      <option value="">All Categories</option>
+                      <option value="Criminal">Criminal Law</option>
+                      <option value="Constitutional">Constitutional Law</option>
+                      <option value="Civil">Civil Law</option>
+                      <option value="Commercial">Commercial / IBC</option>
                     </select>
                   </div>
                 </div>
-              </div>
+              )}
 
-              {/* Search Bar Input */}
-              <div className="flex gap-2">
+              {/* Inquiry Input Form */}
+              <div className="flex flex-col sm:flex-row gap-2">
                 <div className="relative flex-1 flex items-center">
                   <Search size={18} className="absolute left-4 text-zinc-400 pointer-events-none" />
                   <Input
                     type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                    placeholder="Enter legal issue, case ratio, or constitutional inquiry..."
+                    value={queryText}
+                    onChange={(e) => setQueryText(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleRunAnalysis()}
+                    placeholder="Enter legal issue, case facts, or statutory provisions..."
                     className="pl-11 pr-4 py-6 bg-zinc-50 border-black/15 text-sm rounded-xl text-black focus-visible:ring-0 focus-visible:border-black shadow-xs"
                   />
                 </div>
                 <Button
-                  onClick={() => handleSearch()}
-                  disabled={searching || generatingOpinion}
-                  className="bg-black text-white hover:bg-zinc-800 rounded-xl px-5 py-6 font-semibold cursor-pointer shadow-xs disabled:opacity-60"
+                  onClick={() => handleRunAnalysis()}
+                  disabled={analyzing}
+                  className="bg-black text-white hover:bg-zinc-800 rounded-xl px-7 py-6 font-semibold cursor-pointer shadow-xs disabled:opacity-60 flex items-center justify-center gap-2"
                 >
-                  {searching ? (
+                  {analyzing ? (
                     <>
-                      <Loader2 size={16} className="mr-2 animate-spin" />
-                      <span>Searching...</span>
-                    </>
-                  ) : (
-                    <span>Query Precedents</span>
-                  )}
-                </Button>
-                <Button
-                  onClick={() => handleGenerateOpinion()}
-                  disabled={searching || generatingOpinion}
-                  className="bg-zinc-900 text-white hover:bg-black border border-amber-500/40 rounded-xl px-5 py-6 font-semibold cursor-pointer shadow-xs disabled:opacity-60 flex items-center gap-1.5"
-                >
-                  {generatingOpinion ? (
-                    <>
-                      <Loader2 size={16} className="mr-1.5 animate-spin text-amber-400" />
-                      <span>Formulating Opinion...</span>
+                      <Loader2 size={16} className="animate-spin text-amber-300" />
+                      <span>Synthesizing Opinion...</span>
                     </>
                   ) : (
                     <>
-                      <Sparkles size={15} className="text-amber-400" />
-                      <span>AI Advisory Opinion</span>
+                      <Sparkles size={16} className="text-amber-300" />
+                      <span>Analyze & Formulate Opinion</span>
                     </>
                   )}
                 </Button>
               </div>
 
-              {/* Sample Queries Chips */}
+              {/* Landmark Queries Chips */}
               <div className="mt-3 flex items-center gap-2 flex-wrap">
-                <span className="text-[11px] font-mono text-zinc-500">Quick Landmark Probes:</span>
-                {suggestedQueries.map((q, idx) => (
+                <span className="text-[11px] font-mono text-zinc-500">Quick Landmark Inquiries:</span>
+                {landmarkQueries.map((item, idx) => (
                   <button
                     key={idx}
                     onClick={() => {
-                      setSearchQuery(q);
-                      handleSearch(q);
+                      setQueryText(item.query);
+                      handleRunAnalysis(item.query);
                     }}
                     className="text-[11px] bg-zinc-100 hover:bg-zinc-200 border border-black/10 px-2.5 py-1 rounded-full text-zinc-700 transition-colors cursor-pointer"
                   >
-                    {q.length > 38 ? `${q.substring(0, 38)}...` : q}
+                    {item.title}
                   </button>
                 ))}
               </div>
             </div>
 
-            {/* Search Notices & Errors */}
-            {searchNotice && (
-              <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl text-xs flex items-center gap-3">
-                <AlertCircle size={18} className="shrink-0 text-amber-600" />
-                <div className="leading-relaxed">{searchNotice}</div>
-              </div>
-            )}
-
+            {/* Error Message */}
             {searchError && (
               <div className="p-4 bg-red-50 border border-red-200 text-red-700 rounded-xl text-xs flex items-center gap-3">
                 <AlertCircle size={18} className="shrink-0" />
@@ -516,166 +553,189 @@ export default function ConsolePage() {
               </div>
             )}
 
-            {searching && (
-              <div className="flex flex-col items-center justify-center py-20 bg-white border border-black/10 rounded-2xl gap-3 text-center">
-                <Loader2 size={32} className="animate-spin text-black" />
-                <h3 className="font-bold text-sm text-black font-display">
-                  QUERYING WEAVIATE HYBRID VECTORS
+            {/* Groq API Key Missing Guidance Banner */}
+            {groqMissingNotice && (
+              <div className="p-5 bg-amber-50 border border-amber-300 text-amber-900 rounded-2xl text-xs flex flex-col gap-2 animate-in fade-in">
+                <div className="flex items-center gap-2 font-bold font-display text-sm">
+                  <AlertCircle size={18} className="text-amber-700 shrink-0" />
+                  <span>GROQ_API_KEY Required on Render Backend</span>
+                </div>
+                <p className="text-amber-800 leading-relaxed">
+                  Weaviate precedent retrieval succeeded, but neural opinion synthesis requires your Groq API key on the backend.
+                </p>
+                <div className="bg-white/80 p-3 rounded-lg border border-amber-200 font-mono text-[11px] text-amber-950">
+                  <span>To enable live Groq LLM opinions:</span>
+                  <ol className="list-decimal list-inside mt-1 space-y-0.5">
+                    <li>Open your <a href="https://dashboard.render.com" target="_blank" rel="noreferrer" className="underline font-bold">Render Dashboard</a>.</li>
+                    <li>Select <strong>legal-ai-backend-75al</strong> &rarr; <strong>Environment</strong>.</li>
+                    <li>Add <code>GROQ_API_KEY</code> with your key from <code>legal-ai-backend/.env</code>.</li>
+                  </ol>
+                </div>
+                <span className="text-[11px] text-amber-700 mt-1">
+                  Retrieved precedents are shown below in the meantime.
+                </span>
+              </div>
+            )}
+
+            {/* Loading Indicator */}
+            {analyzing && (
+              <div className="flex flex-col items-center justify-center py-20 bg-white border border-black/10 rounded-2xl gap-3 text-center shadow-xs">
+                <div className="relative flex items-center justify-center">
+                  <Loader2 size={40} className="animate-spin text-black" />
+                  <Sparkles size={16} className="absolute text-amber-500 animate-pulse" />
+                </div>
+                <h3 className="font-bold text-sm text-black font-display uppercase tracking-wider mt-2">
+                  EXECUTING INDIAN LEGAL RAG PIPELINE
                 </h3>
-                <p className="text-xs text-zinc-500 max-w-sm">
-                  Computing 384-dimensional text embeddings and scanning landmark Indian court judgments...
+                <p className="text-xs text-zinc-500 max-w-md leading-relaxed">
+                  1. Querying Weaviate Cloud vector repository for landmark precedents...<br />
+                  2. Extracting judicial ratios and statutory interpretations...<br />
+                  3. Synthesizing structured advisory opinion via Groq ({selectedModel})...
                 </p>
               </div>
             )}
 
-            {generatingOpinion && (
-              <div className="flex flex-col items-center justify-center py-16 bg-white border border-black/10 rounded-2xl gap-3 text-center shadow-xs">
-                <Loader2 size={32} className="animate-spin text-amber-600" />
-                <h3 className="font-bold text-sm text-black font-display">
-                  SYNTHESIZING JUDICIAL ADVISORY OPINION
-                </h3>
-                <p className="text-xs text-zinc-500 max-w-sm">
-                  Scanning Weaviate Cloud precedent ratios and formulating high-court legal analysis via Groq ({opinionModel || "Qwen 3.8-27B"})...
-                </p>
-              </div>
-            )}
-
-            {advisoryOpinion && !generatingOpinion && (
-              <Card className="p-6 bg-white border-amber-500/30 rounded-2xl shadow-xs">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-4 border-b border-black/10">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="p-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
-                      <Scale size={16} />
-                    </span>
-                    <h3 className="text-base font-bold text-black font-display">
-                      LEGAL ADVISORY OPINION
-                    </h3>
-                    <Badge className="bg-amber-100 text-amber-900 border-amber-300 text-[10px] font-mono">
-                      Groq Cloud: {opinionModel || "qwen/qwen3.8-27b"}
-                    </Badge>
-                    {opinionLatency && (
-                      <span className="text-[10px] font-mono text-zinc-500">
-                        Synthesized in {(opinionLatency / 1000).toFixed(2)}s
-                      </span>
-                    )}
-                  </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={handleCopyOpinion}
-                    className="text-xs rounded-lg border-black/15 text-zinc-700 hover:text-black gap-1.5 self-start sm:self-auto"
-                  >
-                    {opinionCopied ? (
-                      <>
-                        <Check size={13} className="text-emerald-600" />
-                        <span>Opinion Copied</span>
-                      </>
-                    ) : (
-                      <>
-                        <Copy size={13} />
-                        <span>Copy Opinion</span>
-                      </>
-                    )}
-                  </Button>
-                </div>
-                <div className="text-xs leading-relaxed text-zinc-800 whitespace-pre-wrap font-sans">
-                  {advisoryOpinion}
-                </div>
-              </Card>
-            )}
-
-            {!searching && searchResults.length > 0 && (
+            {/* Results Section */}
+            {!analyzing && (ragResult || displayedPrecedents.length > 0) && (
               <div className="flex flex-col gap-4">
-                <div className="flex items-center justify-between text-xs font-mono text-zinc-500 px-1">
-                  <span>Found {totalResults} matching precedent chunks</span>
-                  <span>Cluster: Weaviate Cloud (WCS)</span>
+                {/* Result Sub-Tab Switcher */}
+                <div className="flex items-center justify-between border-b border-black/10 pb-2">
+                  <div className="flex items-center gap-2">
+                    {ragResult && (
+                      <button
+                        onClick={() => setActiveResultSubTab('opinion')}
+                        className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
+                          activeResultSubTab === 'opinion'
+                            ? 'bg-black text-white shadow-xs'
+                            : 'bg-white text-zinc-600 border border-black/10 hover:border-black/30'
+                        }`}
+                      >
+                        <Sparkles size={13} className="text-amber-300" />
+                        <span>Judicial Advisory Opinion</span>
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => setActiveResultSubTab('precedents')}
+                      className={`px-4 py-1.5 rounded-lg text-xs font-semibold cursor-pointer transition-all flex items-center gap-1.5 ${
+                        activeResultSubTab === 'precedents'
+                          ? 'bg-black text-white shadow-xs'
+                          : 'bg-white text-zinc-600 border border-black/10 hover:border-black/30'
+                      }`}
+                    >
+                      <BookOpen size={13} />
+                      <span>Cited Precedents ({displayedPrecedents.length})</span>
+                    </button>
+                  </div>
+
+                  <div className="text-[11px] font-mono text-zinc-500 hidden sm:block">
+                    {ragResult ? `Pipeline: ${ragResult.search_mode_used} • ${ragResult.execution_time_ms} ms` : 'Weaviate Precedent Matches'}
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
-                  {searchResults.map((item, index) => {
-                    const title = item.title || item.metadata?.case_title || 'Supreme Court / High Court Ruling';
-                    const court = item.metadata?.court_name || 'Apex Court of India';
-                    const date = item.metadata?.decision_date || item.metadata?.year || 'Precedent Archive';
-                    const sourceUrl = item.metadata?.source_url as string | undefined;
+                {/* Sub-Tab 1: Legal Opinion Viewer */}
+                {activeResultSubTab === 'opinion' && ragResult && (
+                  <LegalOpinionViewer
+                    answer={ragResult.answer}
+                    query={ragResult.query}
+                    modelUsed={ragResult.model_used}
+                    executionTimeMs={ragResult.execution_time_ms}
+                    searchModeUsed={ragResult.search_mode_used}
+                    onSaveToThread={handlePinAnalysisToThread}
+                  />
+                )}
 
-                    return (
-                      <Card key={item.id || index} className="p-6 bg-white border-black/10 rounded-2xl shadow-xs hover:border-black/30 transition-all">
-                        <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-3">
-                          <div className="flex-1">
-                            <div className="flex items-center gap-2 mb-1 flex-wrap">
-                              <Badge className="bg-black text-white text-[10px] font-mono">
-                                MATCH #{index + 1}
-                              </Badge>
-                              {item.score !== undefined && item.score !== null && (
-                                <Badge variant="outline" className="text-[10px] font-mono border-emerald-300 bg-emerald-50 text-emerald-800">
-                                  Score: {item.score.toFixed(4)}
+                {/* Sub-Tab 2: Precedent Citation Cards */}
+                {activeResultSubTab === 'precedents' && (
+                  <div className="grid grid-cols-1 gap-4">
+                    {displayedPrecedents.map((item, index) => {
+                      const title = item.title || item.metadata?.case_title || 'Supreme Court / High Court Ruling';
+                      const court = item.metadata?.court_name || 'Apex Court of India';
+                      const date = item.metadata?.decision_date || item.metadata?.year || 'Precedent Archive';
+                      const sourceUrl = item.metadata?.source_url as string | undefined;
+
+                      return (
+                        <Card key={item.id || index} className="p-6 bg-white border-black/10 rounded-2xl shadow-xs hover:border-black/30 transition-all">
+                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 mb-3">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <Badge className="bg-black text-white text-[10px] font-mono">
+                                  PRECEDENT #{index + 1}
                                 </Badge>
-                              )}
-                              <span className="text-xs font-mono text-zinc-500">
-                                {court} • {date}
-                              </span>
+                                {item.score !== undefined && item.score !== null && (
+                                  <Badge variant="outline" className="text-[10px] font-mono border-emerald-300 bg-emerald-50 text-emerald-800">
+                                    Score: {item.score.toFixed(4)}
+                                  </Badge>
+                                )}
+                                <span className="text-xs font-mono text-zinc-500">
+                                  {court} • {date}
+                                </span>
+                              </div>
+                              <h3 className="text-base font-bold text-black font-display">
+                                {title}
+                              </h3>
                             </div>
-                            <h3 className="text-base font-bold text-black font-display">
-                              {title}
-                            </h3>
-                          </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
-                            {sourceUrl && (
-                              <a
-                                href={sourceUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="p-2 border border-black/10 rounded-lg text-zinc-600 hover:text-black hover:bg-zinc-50 transition-colors"
-                                title="Open Kanoon Source"
-                              >
-                                <ExternalLink size={14} />
-                              </a>
-                            )}
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleCopy(item.id, item.content || '')}
-                              className="text-xs rounded-lg border-black/15 text-zinc-700 hover:text-black"
-                            >
-                              {copiedId === item.id ? (
-                                <>
-                                  <Check size={13} className="text-emerald-600 mr-1" />
-                                  <span>Copied</span>
-                                </>
-                              ) : (
-                                <>
-                                  <Copy size={13} className="mr-1" />
-                                  <span>Extract</span>
-                                </>
+                            <div className="flex items-center gap-2 shrink-0">
+                              {sourceUrl && (
+                                <a
+                                  href={sourceUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="p-2 border border-black/10 rounded-lg text-zinc-600 hover:text-black hover:bg-zinc-50 transition-colors"
+                                  title="Open Kanoon Source Document"
+                                >
+                                  <ExternalLink size={14} />
+                                </a>
                               )}
-                            </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleCopyExtract(item.id, item.content || '')}
+                                className="text-xs rounded-lg border-black/15 text-zinc-700 hover:text-black"
+                              >
+                                {copiedExtractId === item.id ? (
+                                  <>
+                                    <Check size={13} className="text-emerald-600 mr-1" />
+                                    <span>Copied</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Copy size={13} className="mr-1" />
+                                    <span>Extract</span>
+                                  </>
+                                )}
+                              </Button>
+                            </div>
                           </div>
-                        </div>
 
-                        {/* Extract Paragraph */}
-                        <div className="bg-zinc-50 rounded-xl p-4 border border-black/5 text-xs text-zinc-800 leading-relaxed font-serif whitespace-pre-line">
-                          {item.content || item.title || (item.metadata && Object.keys(item.metadata).length > 0 ? JSON.stringify(item.metadata, null, 2) : `Precedent judgment chunk (${item.id}) indexed in Weaviate Cloud.`)}
-                        </div>
-                      </Card>
-                    );
-                  })}
-                </div>
+                          {/* Quoted Extract */}
+                          <div className="bg-zinc-50 rounded-xl p-4 border border-black/5 text-xs text-zinc-800 leading-relaxed font-serif whitespace-pre-line">
+                            {item.content || item.title || (item.metadata && Object.keys(item.metadata).length > 0 ? JSON.stringify(item.metadata, null, 2) : `Precedent judgment chunk (${item.id}) indexed in Weaviate Cloud.`)}
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
-            {!searching && searchResults.length === 0 && !searchError && (
+            {/* Empty State when no search executed yet */}
+            {!analyzing && !ragResult && displayedPrecedents.length === 0 && !searchError && (
               <div className="bg-white border border-black/10 rounded-2xl p-12 text-center flex flex-col items-center justify-center">
-                <Database size={40} className="text-zinc-400 mb-3" />
-                <h3 className="text-base font-bold text-black font-display">READY FOR LEGAL RESEARCH</h3>
-                <p className="text-xs text-zinc-500 max-w-md mt-1 mb-4">
-                  Enter any legal proposition or choose one of the landmark probes above to query vector similarities directly from Weaviate Cloud.
+                <Scale size={40} className="text-zinc-400 mb-3" />
+                <h3 className="text-base font-bold text-black font-display uppercase tracking-wide">
+                  READY FOR JUDICIAL ANALYSIS
+                </h3>
+                <p className="text-xs text-zinc-500 max-w-md mt-1 mb-4 leading-relaxed">
+                  Enter your legal proposition or select one of the landmark inquiries above to formulate an Indian Supreme Court & High Court advisory opinion with authoritative citations.
                 </p>
                 <Button
-                  onClick={() => handleSearch()}
+                  onClick={() => handleRunAnalysis()}
                   className="bg-black text-white hover:bg-zinc-800 rounded-full text-xs font-semibold px-6 py-4"
                 >
-                  Run Initial Privacy Probe
+                  Run Anticipatory Bail Analysis
                 </Button>
               </div>
             )}
@@ -772,7 +832,7 @@ export default function ConsolePage() {
                         <span>Briefing & Drafting Threads</span>
                       </h4>
 
-                      {/* Add Thread Inline Form */}
+                      {/* Add Thread Form */}
                       <form onSubmit={handleCreateThread} className="flex gap-2">
                         <Input
                           type="text"
@@ -820,10 +880,10 @@ export default function ConsolePage() {
                             </div>
 
                             <textarea
-                              rows={8}
+                              rows={10}
                               value={threadNotes}
                               onChange={(e) => setThreadNotes(e.target.value)}
-                              placeholder={`Drafting legal arguments, citations, and witness preparation notes for "${activeThread.title}"...`}
+                              placeholder={`Drafting legal arguments, citations, and witness preparation notes for "${activeThread.title}"...\n(Tip: You can pin full opinions from the AI Legal Advisory tab directly into this canvas)`}
                               className="w-full bg-white border border-black/15 rounded-xl p-3 text-xs text-black font-serif leading-relaxed focus:outline-none focus:border-black"
                             />
 
@@ -831,7 +891,7 @@ export default function ConsolePage() {
                               <span>Auto-synced with legal case record</span>
                               <Button
                                 size="sm"
-                                onClick={() => alert('Draft notes saved.')}
+                                onClick={() => alert('Draft brief notes saved.')}
                                 className="bg-black text-white hover:bg-zinc-800 text-xs px-4"
                               >
                                 Save Draft Notes
@@ -842,7 +902,7 @@ export default function ConsolePage() {
                       </div>
                     ) : (
                       <div className="bg-zinc-50 rounded-xl p-8 text-center text-xs text-zinc-500 border border-black/10">
-                        No threads created for this case yet. Enter a thread title above (e.g. &quot;Bail Arguments&quot; or &quot;Cross-Examination Questions&quot;) to start drafting.
+                        No threads created for this case yet. Enter a thread title above (e.g. &quot;Bail Arguments&quot;) to start drafting.
                       </div>
                     )}
                   </div>
@@ -874,7 +934,7 @@ export default function ConsolePage() {
                   variant="outline"
                   onClick={() => {
                     checkBackendHealth();
-                    loadVectorStatus();
+                    loadDiagnostics();
                   }}
                   className="rounded-full text-xs gap-1.5"
                 >
@@ -882,59 +942,69 @@ export default function ConsolePage() {
                 </Button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 mb-6">
                 {/* Status Card 1 */}
                 <Card className="p-4 bg-zinc-50 border-black/10 rounded-xl">
                   <div className="text-[10px] font-mono text-zinc-500 uppercase">FastAPI Service</div>
                   <div className="text-base font-bold text-black mt-1">{backendHealth.service || 'Legal AI Backend'}</div>
                   <div className="flex items-center gap-1 text-[11px] text-emerald-600 font-semibold mt-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    {backendHealth.state === 'online' ? 'Online & Responsive' : backendHealth.state}
+                    {backendHealth.state === 'online' ? 'Online' : backendHealth.state}
                   </div>
                 </Card>
 
                 {/* Status Card 2 */}
                 <Card className="p-4 bg-zinc-50 border-black/10 rounded-xl">
-                  <div className="text-[10px] font-mono text-zinc-500 uppercase">PostgreSQL Database</div>
-                  <div className="text-base font-bold text-black mt-1">Neon Cloud</div>
+                  <div className="text-[10px] font-mono text-zinc-500 uppercase">PostgreSQL (Neon)</div>
+                  <div className="text-base font-bold text-black mt-1">Database</div>
                   <div className="flex items-center gap-1 text-[11px] text-emerald-600 font-semibold mt-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Status: {backendHealth.postgres || 'connected'}
+                    {backendHealth.postgres || 'connected'}
                   </div>
                 </Card>
 
                 {/* Status Card 3 */}
                 <Card className="p-4 bg-zinc-50 border-black/10 rounded-xl">
-                  <div className="text-[10px] font-mono text-zinc-500 uppercase">Vector Database</div>
-                  <div className="text-base font-bold text-black mt-1">Weaviate Cloud (WCS)</div>
+                  <div className="text-[10px] font-mono text-zinc-500 uppercase">Weaviate Cloud</div>
+                  <div className="text-base font-bold text-black mt-1">Vector DB</div>
                   <div className="flex items-center gap-1 text-[11px] text-emerald-600 font-semibold mt-1">
                     <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                    Status: {backendHealth.weaviate || 'connected'}
+                    {backendHealth.weaviate || 'connected'}
+                  </div>
+                </Card>
+
+                {/* Status Card 4 */}
+                <Card className="p-4 bg-zinc-50 border-black/10 rounded-xl">
+                  <div className="text-[10px] font-mono text-zinc-500 uppercase">Groq LLM Engine</div>
+                  <div className="text-base font-bold text-black mt-1">Qwen 3.8-27B</div>
+                  <div className="flex items-center gap-1 text-[11px] font-semibold mt-1">
+                    <span className={`w-1.5 h-1.5 rounded-full ${ragModelInfo?.groq_configured ? 'bg-emerald-500' : 'bg-amber-500'}`} />
+                    <span className={ragModelInfo?.groq_configured ? 'text-emerald-600' : 'text-amber-700'}>
+                      {ragModelInfo?.groq_configured ? 'Configured' : 'Key Unset'}
+                    </span>
                   </div>
                 </Card>
               </div>
 
-              {/* Weaviate Cluster Information */}
+              {/* Cluster & Model Metadata */}
               <div className="p-4 bg-zinc-50 rounded-xl border border-black/10 space-y-2 text-xs font-mono">
                 <div className="font-bold text-black uppercase tracking-wider text-[11px]">
-                  Weaviate Index Metadata:
+                  RAG Architecture & Cluster Info:
                 </div>
                 {vectorStatus ? (
                   <div className="space-y-1 text-zinc-600">
-                    <div>Configured Cluster: <strong>{vectorStatus.configured_url}</strong></div>
-                    <div>Default Target Collection: <strong>{vectorStatus.default_collection}</strong></div>
+                    <div>Weaviate Cluster: <strong>{vectorStatus.configured_url}</strong></div>
+                    <div>Default Target Collection: <strong>{vectorStatus.default_collection}</strong> (22,500+ Indian judgments)</div>
                     <div>
-                      Available Collections:{' '}
+                      Supported Groq Models:{' '}
                       <strong>
-                        {vectorStatus.available_collections && vectorStatus.available_collections.length > 0 
-                          ? vectorStatus.available_collections.join(', ') 
-                          : 'LegalChunk'}
+                        {ragModelInfo?.supported_models?.join(', ') || 'qwen/qwen3.8-27b, openai/gpt-oss-120b'}
                       </strong>
                     </div>
                   </div>
                 ) : (
                   <div className="text-zinc-500">
-                    {loadingVectorStatus ? 'Loading Weaviate cluster info...' : 'Cluster info retrieved upon probe.'}
+                    {loadingDiagnostics ? 'Loading cluster info...' : 'Cluster info retrieved upon probe.'}
                   </div>
                 )}
               </div>
