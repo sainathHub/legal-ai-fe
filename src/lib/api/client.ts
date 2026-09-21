@@ -16,6 +16,9 @@ import {
   VectorSearchResponse,
   VectorStatus,
   DocumentChunkCreate,
+  LegalRAGRequest,
+  LegalRAGResponse,
+  LegalRAGModelInfo,
 } from './types';
 
 const STORAGE_KEY_TOKEN = 'legal_ai_access_token';
@@ -211,5 +214,16 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(chunk),
       }),
+  },
+
+  // Legal RAG & LLM Advisory Opinion
+  rag: {
+    query: (data: LegalRAGRequest) =>
+      request<LegalRAGResponse>("/api/v1/rag/query", {
+        method: "POST",
+        body: JSON.stringify(data),
+      }),
+    models: () =>
+      request<LegalRAGModelInfo>("/api/v1/rag/models"),
   },
 };

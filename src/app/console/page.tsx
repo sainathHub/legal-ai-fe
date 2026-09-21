@@ -23,7 +23,9 @@ import {
   RefreshCw,
   Clock,
   Send,
-  Layers
+  Layers,
+  Sparkles,
+  Scale
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -57,6 +59,13 @@ export default function ConsolePage() {
   const [searchError, setSearchError] = useState<string | null>(null);
   const [searchNotice, setSearchNotice] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  // AI Legal Advisory Opinion State
+  const [advisoryOpinion, setAdvisoryOpinion] = useState<string | null>(null);
+  const [generatingOpinion, setGeneratingOpinion] = useState(false);
+  const [opinionModel, setOpinionModel] = useState<string | null>(null);
+  const [opinionLatency, setOpinionLatency] = useState<number | null>(null);
+  const [opinionCopied, setOpinionCopied] = useState(false);
 
   // Projects / Cases State
   const [projects, setProjects] = useState<Project[]>([]);
@@ -187,6 +196,47 @@ export default function ConsolePage() {
     } finally {
       setSearching(false);
     }
+  };
+
+  // Formulate AI Legal Advisory Opinion using Weaviate Cloud + Groq LLM
+  const handleGenerateOpinion = async (queryText: string = searchQuery) => {
+    if (!queryText.trim()) return;
+    setGeneratingOpinion(true);
+    setSearchError(null);
+    setSearchNotice(null);
+
+    if (!isAuthenticated) {
+      setGeneratingOpinion(false);
+      setAuthModalOpen(true);
+      return;
+    }
+
+    try {
+      const res = await api.rag.query({
+        query: queryText.trim(),
+        limit: searchLimit,
+        search_mode: searchAlpha > 0 ? "hybrid" : "bm25",
+      });
+      setAdvisoryOpinion(res.answer);
+      setOpinionModel(res.model_used);
+      setOpinionLatency(res.execution_time_ms);
+      if (res.precedents && res.precedents.length > 0) {
+        setSearchResults(res.precedents);
+        setTotalResults(res.precedents_count);
+      }
+    } catch (err) {
+      const errMsg = err instanceof ApiError ? err.message : String(err);
+      setSearchError(`AI Advisory generation error: ${errMsg}`);
+    } finally {
+      setGeneratingOpinion(false);
+    }
+  };
+
+  const handleCopyOpinion = () => {
+    if (!advisoryOpinion) return;
+    navigator.clipboard.writeText(advisoryOpinion);
+    setOpinionCopied(true);
+    setTimeout(() => setOpinionCopied(false), 2000);
   };
 
   // Create New Case Project
@@ -402,16 +452,33 @@ export default function ConsolePage() {
                 </div>
                 <Button
                   onClick={() => handleSearch()}
-                  disabled={searching}
-                  className="bg-black text-white hover:bg-zinc-800 rounded-xl px-7 py-6 font-semibold cursor-pointer shadow-xs disabled:opacity-60"
+                  disabled={searching || generatingOpinion}
+                  className="bg-black text-white hover:bg-zinc-800 rounded-xl px-5 py-6 font-semibold cursor-pointer shadow-xs disabled:opacity-60"
                 >
                   {searching ? (
                     <>
                       <Loader2 size={16} className="mr-2 animate-spin" />
-                      <span>Vectorizing...</span>
+                      <span>Searching...</span>
                     </>
                   ) : (
                     <span>Query Precedents</span>
+                  )}
+                </Button>
+                <Button
+                  onClick={() => handleGenerateOpinion()}
+                  disabled={searching || generatingOpinion}
+                  className="bg-zinc-900 text-white hover:bg-black border border-amber-500/40 rounded-xl px-5 py-6 font-semibold cursor-pointer shadow-xs disabled:opacity-60 flex items-center gap-1.5"
+                >
+                  {generatingOpinion ? (
+                    <>
+                      <Loader2 size={16} className="mr-1.5 animate-spin text-amber-400" />
+                      <span>Formulating Opinion...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles size={15} className="text-amber-400" />
+                      <span>AI Advisory Opinion</span>
+                    </>
                   )}
                 </Button>
               </div>
@@ -459,6 +526,62 @@ export default function ConsolePage() {
                   Computing 384-dimensional text embeddings and scanning landmark Indian court judgments...
                 </p>
               </div>
+            )}
+
+            {generatingOpinion && (
+              <div className="flex flex-col items-center justify-center py-16 bg-white border border-black/10 rounded-2xl gap-3 text-center shadow-xs">
+                <Loader2 size={32} className="animate-spin text-amber-600" />
+                <h3 className="font-bold text-sm text-black font-display">
+                  SYNTHESIZING JUDICIAL ADVISORY OPINION
+                </h3>
+                <p className="text-xs text-zinc-500 max-w-sm">
+                  Scanning Weaviate Cloud precedent ratios and formulating high-court legal analysis via Groq ({opinionModel || "Qwen 3.8-27B"})...
+                </p>
+              </div>
+            )}
+
+            {advisoryOpinion && !generatingOpinion && (
+              <Card className="p-6 bg-white border-amber-500/30 rounded-2xl shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4 pb-4 border-b border-black/10">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="p-1.5 rounded-lg bg-amber-50 border border-amber-200 text-amber-800">
+                      <Scale size={16} />
+                    </span>
+                    <h3 className="text-base font-bold text-black font-display">
+                      LEGAL ADVISORY OPINION
+                    </h3>
+                    <Badge className="bg-amber-100 text-amber-900 border-amber-300 text-[10px] font-mono">
+                      Groq Cloud: {opinionModel || "qwen/qwen3.8-27b"}
+                    </Badge>
+                    {opinionLatency && (
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        Synthesized in {(opinionLatency / 1000).toFixed(2)}s
+                      </span>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCopyOpinion}
+                    className="text-xs rounded-lg border-black/15 text-zinc-700 hover:text-black gap-1.5 self-start sm:self-auto"
+                  >
+                    {opinionCopied ? (
+                      <>
+                        <Check size={13} className="text-emerald-600" />
+                        <span>Opinion Copied</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={13} />
+                        <span>Copy Opinion</span>
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <div className="text-xs leading-relaxed text-zinc-800 whitespace-pre-wrap font-sans">
+                  {advisoryOpinion}
+                </div>
+              </Card>
             )}
 
             {!searching && searchResults.length > 0 && (

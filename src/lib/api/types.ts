@@ -132,3 +132,30 @@ export interface VectorStatus {
   default_collection: string;
   available_collections: string[];
 }
+
+export interface LegalRAGRequest {
+  query: string;
+  limit?: number;
+  case_type?: string | null;
+  min_year?: number;
+  search_mode?: "hybrid" | "vector" | "bm25" | string;
+  model?: string | null;
+  max_tokens?: number;
+  thread_id?: string | null;
+}
+
+export interface LegalRAGResponse {
+  query: string;
+  answer: string;
+  model_used: string;
+  precedents_count: number;
+  precedents: VectorSearchResultItem[];
+  search_mode_used: string;
+  execution_time_ms: number;
+}
+
+export interface LegalRAGModelInfo {
+  default_model: string;
+  supported_models: string[];
+  groq_configured: boolean;
+}
