@@ -24,8 +24,10 @@ import {
 
 const STORAGE_KEY_TOKEN = 'legal_ai_access_token';
 const STORAGE_KEY_API_URL = 'legal_ai_api_url';
+const isProd = process.env.NODE_ENV === 'production';
 export const DEFAULT_API_URL =
-  process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  process.env.NEXT_PUBLIC_API_URL ||
+  (isProd ? 'https://legal-ai-backend-75al.onrender.com' : 'http://localhost:8000');
 
 /**
  * Custom error class with status code and detail message
@@ -48,8 +50,8 @@ export class ApiError extends Error {
 export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const customUrl = localStorage.getItem(STORAGE_KEY_API_URL);
-    // Auto-clear stale Render URL when developing locally
-    if (customUrl && customUrl.includes('legal-ai-backend-75al.onrender.com')) {
+    // In local development, if customUrl was pointing to Render, reset it so local dev uses localhost
+    if (!isProd && customUrl && customUrl.includes('legal-ai-backend-75al.onrender.com')) {
       localStorage.removeItem(STORAGE_KEY_API_URL);
       return DEFAULT_API_URL.replace(/\/$/, '');
     }
