@@ -20,6 +20,7 @@ import {
   LegalRAGRequest,
   LegalRAGResponse,
   LegalRAGModelInfo,
+  LegalRAGStreamEvent,
 } from './types';
 
 const STORAGE_KEY_TOKEN = 'legal_ai_access_token';
@@ -239,5 +240,58 @@ export const api = {
       }),
     models: () =>
       request<LegalRAGModelInfo>("/api/v1/rag/models"),
+    /**
+     * Stream SSE tokens from the RAG pipeline.
+     * Yields parsed LegalRAGStreamEvent objects via an async generator.
+     * Caller is responsible for handling each event type.
+     */
+    stream: async function* (
+      data: LegalRAGRequest,
+      signal?: AbortSignal,
+    ): AsyncGenerator<LegalRAGStreamEvent> {
+      const baseUrl = getApiBaseUrl();
+      const token = getAuthToken();
+      const response = await fetch(`${baseUrl}/api/v1/rag/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(data),
+        signal,
+      });
+      if (!response.ok) {
+        let errMsg = `Stream request failed: ${response.status}`;
+        try {
+          const errJson = await response.json() as { detail?: string };
+          if (errJson?.detail) errMsg = typeof errJson.detail === 'string' ? errJson.detail : errMsg;
+        } catch { /* ignore */ }
+        throw new ApiError(errMsg, response.status);
+      }
+      if (!response.body) throw new ApiError('No response body for stream', 500);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() ?? '';
+        let currentEvent = '';
+        for (const line of lines) {
+          if (line.startsWith('event:')) {
+            currentEvent = line.slice(6).trim();
+          } else if (line.startsWith('data:')) {
+            const rawData = line.slice(5).trim();
+            try {
+              const parsed = JSON.parse(rawData);
+              yield { event: currentEvent, data: parsed } as LegalRAGStreamEvent;
+            } catch { /* malformed JSON, skip */ }
+            currentEvent = '';
+          }
+        }
+      }
+    },
   },
 };

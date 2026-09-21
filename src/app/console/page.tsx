@@ -43,11 +43,13 @@ import {
   VectorSearchResultItem, 
   VectorStatus,
   LegalRAGResponse,
-  LegalRAGModelInfo
+  LegalRAGModelInfo,
+  ConversationMessage,
 } from '@/lib/api/types';
 import AuthDialog from '@/components/AuthDialog';
 import LegalOpinionViewer from '@/components/LegalOpinionViewer';
 import CitationsDialog from '@/components/CitationsDialog';
+import ConversationPanel from '@/components/ConversationPanel';
 
 export default function ConsolePage() {
   const router = useRouter();
@@ -73,6 +75,14 @@ export default function ConsolePage() {
   const [groqMissingNotice, setGroqMissingNotice] = useState<boolean>(false);
   const [fallbackPrecedents, setFallbackPrecedents] = useState<VectorSearchResultItem[]>([]);
   const [copiedExtractId, setCopiedExtractId] = useState<string | null>(null);
+
+  // Multi-turn Conversation State
+  const [conversationMessages, setConversationMessages] = useState<ConversationMessage[]>([]);
+  const [conversationThreadId, setConversationThreadId] = useState<string | null>(null);
+  const [conversationThreadTitle, setConversationThreadTitle] = useState<string>('');
+  const [isStreaming, setIsStreaming] = useState(false);
+  const [streamingStatus, setStreamingStatus] = useState<string>('');
+  const abortControllerRef = React.useRef<AbortController | null>(null);
 
   // Projects / Cases State
   const [projects, setProjects] = useState<Project[]>([]);
@@ -175,54 +185,197 @@ export default function ConsolePage() {
     loadDiagnostics();
   }, [isAuthenticated, loadProjects, loadDiagnostics]);
 
-  // Main Action: Run Legal RAG & LLM Analysis
-  const handleRunAnalysis = async (queryInput: string = queryText) => {
-    if (!queryInput.trim()) return;
-    setAnalyzing(true);
+  // ─── Create or reuse a session thread for conversations ───────────────────
+  const ensureConversationThread = async (): Promise<string> => {
+    if (conversationThreadId) return conversationThreadId;
+    const sessionTitle = `Research Session · ${new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+    let projectId: string;
+    if (projects.length > 0) {
+      projectId = projects[0].id;
+    } else {
+      const newProj = await api.projects.create({
+        title: sessionTitle,
+        description: 'Auto-created research session',
+      });
+      setProjects([newProj]);
+      projectId = newProj.id;
+    }
+    const newThread = await api.threads.create(projectId, { title: sessionTitle });
+    setConversationThreadId(newThread.id);
+    setConversationThreadTitle(sessionTitle);
+    return newThread.id;
+  };
+
+  // ─── Main Action: Send a message to the conversation ─────────────────────
+  const sendConversationMessage = async (queryInput: string) => {
+    const trimmed = queryInput.trim();
+    if (!trimmed || isStreaming) return;
+
     setSearchError(null);
     setGroqMissingNotice(false);
 
     if (!isAuthenticated) {
-      setAnalyzing(false);
       setAuthModalOpen(true);
       return;
     }
 
+    const userMsg: ConversationMessage = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: trimmed,
+      created_at: new Date().toISOString(),
+    };
+    setConversationMessages((prev) => [...prev, userMsg]);
+
+    const aiMsgId = `ai-${Date.now()}`;
+    const aiMsgPlaceholder: ConversationMessage = {
+      id: aiMsgId,
+      role: 'assistant',
+      content: '',
+      created_at: new Date().toISOString(),
+      isStreaming: true,
+    };
+    setConversationMessages((prev) => [...prev, aiMsgPlaceholder]);
+    setIsStreaming(true);
+    setStreamingStatus('Contextualizing legal inquiry via LangChain…');
+
+    if (abortControllerRef.current) abortControllerRef.current.abort();
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
     try {
-      const response = await api.rag.query({
-        query: queryInput.trim(),
-        limit: searchLimit,
-        search_mode: searchMode,
-        model: selectedModel,
-        case_type: caseTypeFilter || null,
-        min_year: minYearFilter > 0 ? minYearFilter : undefined,
-      });
+      let threadId: string;
+      try {
+        threadId = await ensureConversationThread();
+      } catch {
+        threadId = '';
+      }
 
-      setRagResult(response);
+      let accContent = '';
+      let precedents: VectorSearchResultItem[] = [];
+      let standaloneQuery: string | null = null;
+      let executionTimeMs = 0;
+      let tokensUsed: number | undefined;
+
+      const stream = api.rag.stream(
+        {
+          query: trimmed,
+          limit: searchLimit,
+          search_mode: searchMode,
+          model: selectedModel,
+          case_type: caseTypeFilter || null,
+          min_year: minYearFilter > 0 ? minYearFilter : undefined,
+          ...(threadId ? { thread_id: threadId } : {}),
+        },
+        controller.signal,
+      );
+
+      for await (const event of stream) {
+        if (controller.signal.aborted) break;
+
+        if (event.event === 'status') {
+          setStreamingStatus(event.data.message ?? event.data.stage ?? 'Processing…');
+        } else if (event.event === 'precedents') {
+          precedents = (event.data.precedents as VectorSearchResultItem[]) ?? [];
+          standaloneQuery = event.data.standalone_query ?? null;
+          setStreamingStatus('Synthesizing judicial opinion via Groq…');
+          if (standaloneQuery && standaloneQuery !== trimmed) {
+            setConversationMessages((prev) =>
+              prev.map((m) =>
+                m.id === userMsg.id ? { ...m, standalone_query: standaloneQuery } : m
+              )
+            );
+          }
+        } else if (event.event === 'token') {
+          accContent += event.data.token ?? '';
+          const currentContent = accContent;
+          const currentPrecedents = precedents;
+          setConversationMessages((prev) =>
+            prev.map((m) =>
+              m.id === aiMsgId
+                ? { ...m, content: currentContent, precedents: currentPrecedents, isStreaming: true }
+                : m
+            )
+          );
+        } else if (event.event === 'done') {
+          executionTimeMs = event.data.execution_time_ms ?? 0;
+          tokensUsed = event.data.tokens_used;
+          break;
+        } else if (event.event === 'error') {
+          throw new Error(event.data.message ?? 'Stream error');
+        }
+      }
+
+      setConversationMessages((prev) =>
+        prev.map((m) =>
+          m.id === aiMsgId
+            ? {
+                ...m,
+                content: accContent,
+                precedents,
+                standalone_query: standaloneQuery,
+                isStreaming: false,
+                execution_time_ms: executionTimeMs,
+                tokens_used: tokensUsed ?? null,
+              }
+            : m
+        )
+      );
     } catch (err) {
-      const errMsg = err instanceof ApiError ? err.message : String(err);
+      if ((err as Error)?.name === 'AbortError') return;
+      const errMsg = err instanceof Error ? err.message : String(err);
 
-      // Check if Groq API key is missing on the server
       if (errMsg.includes('GROQ_API_KEY is not configured')) {
         setGroqMissingNotice(true);
-        // Fall back to querying precedents so advocate still gets vector results
+        setConversationMessages((prev) => prev.filter((m) => m.id !== aiMsgId));
         try {
           const vRes = await api.vectors.search({
-            query: queryInput.trim(),
+            query: trimmed,
             limit: searchLimit,
             alpha: searchMode === 'hybrid' ? 0.5 : searchMode === 'vector' ? 1.0 : 0.0,
           });
           setFallbackPrecedents(vRes.results || []);
           setCitationsModalOpen(true);
-        } catch {
-          // Ignore secondary fallback error
-        }
+        } catch { /* ignore */ }
       } else {
         setSearchError(errMsg);
+        setConversationMessages((prev) =>
+          prev.map((m) =>
+            m.id === aiMsgId
+              ? { ...m, content: `⚠️ Error: ${errMsg}`, isStreaming: false }
+              : m
+          )
+        );
       }
     } finally {
-      setAnalyzing(false);
+      setIsStreaming(false);
+      setStreamingStatus('');
     }
+  };
+
+  // Backwards-compat wrapper for top query bar
+  const handleRunAnalysis = (queryInput: string = queryText) => {
+    setQueryText(queryInput);
+    sendConversationMessage(queryInput);
+  };
+
+  // Clear conversation (delete from backend + local state)
+  const handleClearConversation = async () => {
+    setConversationMessages([]);
+    setRagResult(null);
+    if (conversationThreadId) {
+      try { await api.threads.clearMessages(conversationThreadId); } catch { /* ignore */ }
+    }
+  };
+
+  // Reset to brand-new conversation (new thread)
+  const handleNewConversation = () => {
+    setConversationMessages([]);
+    setConversationThreadId(null);
+    setConversationThreadTitle('');
+    setRagResult(null);
+    setSearchError(null);
+    setGroqMissingNotice(false);
   };
 
   // Pin Analysis to Active Case Thread
@@ -589,57 +742,17 @@ export default function ConsolePage() {
               </div>
             )}
 
-            {/* Loading Indicator */}
-            {analyzing && (
-              <div className="flex flex-col items-center justify-center py-20 bg-white border border-black/10 rounded-2xl gap-3 text-center shadow-xs">
-                <div className="relative flex items-center justify-center">
-                  <Loader2 size={40} className="animate-spin text-black" />
-                  <Sparkles size={16} className="absolute text-amber-500 animate-pulse" />
-                </div>
-                <h3 className="font-bold text-sm text-black font-display uppercase tracking-wider mt-2">
-                  EXECUTING INDIAN LEGAL RAG PIPELINE
-                </h3>
-                <p className="text-xs text-zinc-500 max-w-md leading-relaxed">
-                  1. Querying Weaviate Cloud vector repository for landmark precedents...<br />
-                  2. Extracting judicial ratios and statutory interpretations...<br />
-                  3. Synthesizing structured advisory opinion via Groq ({selectedModel})...
-                </p>
-              </div>
-            )}
-
-            {/* Results Section: Uninterrupted Legal Advisory Opinion */}
-            {!analyzing && ragResult && (
-              <div className="flex flex-col gap-4">
-                <LegalOpinionViewer
-                  answer={ragResult.answer}
-                  query={ragResult.query}
-                  modelUsed={ragResult.model_used}
-                  executionTimeMs={ragResult.execution_time_ms}
-                  searchModeUsed={ragResult.search_mode_used}
-                  precedents={ragResult.precedents}
-                  onSaveToThread={handlePinAnalysisToThread}
-                />
-              </div>
-            )}
-
-            {/* Empty State when no search executed yet */}
-            {!analyzing && !ragResult && displayedPrecedents.length === 0 && !searchError && (
-              <div className="bg-white border border-black/10 rounded-2xl p-12 text-center flex flex-col items-center justify-center">
-                <Scale size={40} className="text-zinc-400 mb-3" />
-                <h3 className="text-base font-bold text-black font-display uppercase tracking-wide">
-                  READY FOR JUDICIAL ANALYSIS
-                </h3>
-                <p className="text-xs text-zinc-500 max-w-md mt-1 mb-4 leading-relaxed">
-                  Enter your legal proposition or select one of the landmark inquiries above to formulate an Indian Supreme Court & High Court advisory opinion with authoritative citations.
-                </p>
-                <Button
-                  onClick={() => handleRunAnalysis()}
-                  className="bg-black text-white hover:bg-zinc-800 rounded-full text-xs font-semibold px-6 py-4"
-                >
-                  Run Anticipatory Bail Analysis
-                </Button>
-              </div>
-            )}
+            {/* Multi-turn Conversation Panel */}
+            <ConversationPanel
+              messages={conversationMessages}
+              isStreaming={isStreaming}
+              streamingStatus={streamingStatus}
+              onSendMessage={sendConversationMessage}
+              onClearConversation={handleClearConversation}
+              onNewConversation={handleNewConversation}
+              threadTitle={conversationThreadTitle || undefined}
+              searchMode={searchMode}
+            />
           </div>
         )}
 

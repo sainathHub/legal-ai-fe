@@ -166,17 +166,38 @@ export interface ThreadMessage {
   thread_id: string;
   role: "user" | "assistant" | "system";
   content: string;
-  sources?: Array<{
-    case_title?: string;
-    court_name?: string;
-    decision_date?: string;
-    case_type?: string;
-    influence_score?: number;
-    doc_url?: string;
-    score?: number;
-    distance?: number;
-    excerpt?: string;
-  }>;
+  sources?: Array<Record<string, unknown>>;
   tokens_used?: number | null;
   created_at: string;
 }
+
+/**
+ * Local chat state for a single conversation turn displayed in ConversationPanel.
+ * Extends ThreadMessage with extra fields for streaming and cited precedents.
+ */
+export interface ConversationMessage {
+  /** Unique ID — either the UUID from the backend or a client-side temp ID */
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  /** The standalone query LangChain derived from conversation history (may differ from content) */
+  standalone_query?: string | null;
+  /** Cited precedent chunks returned alongside the answer */
+  precedents?: VectorSearchResultItem[];
+  tokens_used?: number | null;
+  created_at: string;
+  /** True while the AI is still streaming tokens into this message */
+  isStreaming?: boolean;
+  /** Cumulative latency reported by the backend on stream completion */
+  execution_time_ms?: number;
+}
+
+/**
+ * Union of SSE event payloads streamed by POST /api/v1/rag/stream
+ */
+export type LegalRAGStreamEvent =
+  | { event: "status"; data: { stage: string; message: string } }
+  | { event: "precedents"; data: { standalone_query: string; precedents: VectorSearchResultItem[]; count: number } }
+  | { event: "token"; data: { token: string } }
+  | { event: "done"; data: { execution_time_ms: number; tokens_used?: number } }
+  | { event: "error"; data: { message: string } };
