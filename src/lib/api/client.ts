@@ -272,22 +272,33 @@ export const api = {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      let currentEvent = '';
+
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split('\n');
         buffer = lines.pop() ?? '';
-        let currentEvent = '';
+
         for (const line of lines) {
-          if (line.startsWith('event:')) {
-            currentEvent = line.slice(6).trim();
-          } else if (line.startsWith('data:')) {
-            const rawData = line.slice(5).trim();
+          const trimmed = line.trim();
+          if (!trimmed) {
+            continue;
+          }
+          if (trimmed.startsWith('event:')) {
+            currentEvent = trimmed.slice(6).trim();
+          } else if (trimmed.startsWith('data:')) {
+            const rawData = trimmed.slice(5).trim();
             try {
               const parsed = JSON.parse(rawData);
-              yield { event: currentEvent, data: parsed } as LegalRAGStreamEvent;
-            } catch { /* malformed JSON, skip */ }
+              const eventType = (currentEvent || parsed.type || 'token') as LegalRAGStreamEvent['event'];
+              yield { event: eventType, data: parsed } as LegalRAGStreamEvent;
+            } catch {
+              if (rawData) {
+                yield { event: 'token', data: { delta: rawData } } as LegalRAGStreamEvent;
+              }
+            }
             currentEvent = '';
           }
         }

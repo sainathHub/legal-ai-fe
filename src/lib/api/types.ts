@@ -196,8 +196,28 @@ export interface ConversationMessage {
  * Union of SSE event payloads streamed by POST /api/v1/rag/stream
  */
 export type LegalRAGStreamEvent =
-  | { event: "status"; data: { stage: string; message: string } }
-  | { event: "precedents"; data: { standalone_query: string; precedents: VectorSearchResultItem[]; count: number } }
-  | { event: "token"; data: { token: string } }
-  | { event: "done"; data: { execution_time_ms: number; tokens_used?: number } }
-  | { event: "error"; data: { message: string } };
+  | { event: 'status'; data: { stage: string; message?: string; standalone_query?: string } }
+  | {
+      event: 'precedents';
+      data: {
+        type?: string;
+        standalone_query?: string;
+        search_mode?: string;
+        precedents?: VectorSearchResultItem[];
+        precedents_count?: number;
+        count?: number;
+      };
+    }
+  | { event: 'token'; data: { delta?: string; token?: string; content?: string } }
+  | {
+      event: 'done';
+      data: {
+        type?: string;
+        execution_time_ms?: number;
+        tokens_used?: number;
+        model_used?: string;
+        standalone_query?: string | null;
+      };
+    }
+  | { event: 'error'; data: { type?: string; message?: string; error?: string; detail?: string } };
+

@@ -37,28 +37,37 @@ function FormattedOpinion({ text }: { text: string }) {
         const trimmed = line.trim();
         if (!trimmed) return <div key={idx} className="h-2" />;
 
-        if (trimmed.startsWith('###') || trimmed.startsWith('##') || trimmed.startsWith('#')) {
-          const headerText = trimmed.replace(/^#+\s*/, '');
+        const isHeader =
+          trimmed.startsWith('###') ||
+          trimmed.startsWith('##') ||
+          trimmed.startsWith('#') ||
+          /^(?:[-*]\s*)?[📋🏛️⚖️💡]\s*\*\*/.test(trimmed);
+
+        if (isHeader) {
+          const rawHeader = trimmed
+            .replace(/^#+\s*/, '')
+            .replace(/^[-*]\s*/, '')
+            .trim();
           let iconEl = <FileText size={14} className="text-zinc-600 shrink-0" />;
           let border = 'border-black/15 bg-zinc-50';
 
-          if (headerText.includes('📋') || /opinion|summary/i.test(headerText)) {
+          if (rawHeader.includes('📋') || /opinion|summary/i.test(rawHeader)) {
             iconEl = <Sparkles size={14} className="text-indigo-600 shrink-0" />;
             border = 'border-indigo-200 bg-indigo-50/60';
-          } else if (headerText.includes('🏛️') || /precedent|ratio/i.test(headerText)) {
+          } else if (rawHeader.includes('🏛️') || /precedent|ratio/i.test(rawHeader)) {
             iconEl = <BookOpen size={14} className="text-emerald-700 shrink-0" />;
             border = 'border-emerald-200 bg-emerald-50/60';
-          } else if (headerText.includes('⚖️') || /statutory|provisions/i.test(headerText)) {
+          } else if (rawHeader.includes('⚖️') || /statutory|provisions/i.test(rawHeader)) {
             iconEl = <Scale size={14} className="text-amber-700 shrink-0" />;
             border = 'border-amber-200 bg-amber-50/60';
-          } else if (headerText.includes('💡') || /strategic|steps|advice/i.test(headerText)) {
+          } else if (rawHeader.includes('💡') || /strategic|steps|advice/i.test(rawHeader)) {
             iconEl = <Lightbulb size={14} className="text-blue-700 shrink-0" />;
             border = 'border-blue-200 bg-blue-50/60';
           }
           return (
-            <div key={idx} className={`mt-4 mb-2 p-2 rounded-lg border flex items-center gap-2 text-xs font-bold font-display text-black ${border}`}>
+            <div key={idx} className={`mt-4 mb-2 p-2.5 rounded-lg border flex items-center gap-2 text-xs font-bold font-display text-black ${border}`}>
               {iconEl}
-              <span>{headerText}</span>
+              <span dangerouslySetInnerHTML={{ __html: formatInline(rawHeader) }} />
             </div>
           );
         }
@@ -88,9 +97,11 @@ function FormattedOpinion({ text }: { text: string }) {
 function MessageBubble({
   message,
   searchMode,
+  streamingStatus,
 }: {
   message: ConversationMessage;
   searchMode?: string;
+  streamingStatus?: string;
 }) {
   const [citationsOpen, setCitationsOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -169,9 +180,14 @@ function MessageBubble({
             </div>
           </div>
           {message.isStreaming && !message.content ? (
-            <div className="flex items-center gap-2 py-4 text-zinc-400">
-              <Loader2 size={14} className="animate-spin" />
-              <span className="text-xs font-mono">Synthesizing judicial opinion…</span>
+            <div className="flex items-center gap-2.5 py-4 text-zinc-600">
+              <Loader2 size={14} className="animate-spin text-indigo-600 shrink-0" />
+              <span className="text-xs font-mono">{streamingStatus || 'Synthesizing judicial opinion…'}</span>
+            </div>
+          ) : !message.content && !message.isStreaming ? (
+            <div className="py-3 px-3 rounded-lg bg-zinc-50 border border-black/10 text-zinc-500 text-xs italic font-mono flex items-center gap-2">
+              <Sparkles size={14} className="text-zinc-400 shrink-0" />
+              <span>No opinion content received from advisory engine. Please try submitting again.</span>
             </div>
           ) : (
             <FormattedOpinion text={message.content} />
@@ -324,7 +340,12 @@ export default function ConversationPanel({
         )}
 
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} searchMode={searchMode} />
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            searchMode={searchMode}
+            streamingStatus={streamingStatus}
+          />
         ))}
 
         {/* Streaming status indicator before first token arrives */}

@@ -274,11 +274,20 @@ export default function ConsolePage() {
         if (controller.signal.aborted) break;
 
         if (event.event === 'status') {
-          setStreamingStatus(event.data.message ?? event.data.stage ?? 'Processing…');
+          const statusText =
+            event.data.message ||
+            (event.data.stage === 'contextualizing'
+              ? 'Evaluating dialogue history via LangChain…'
+              : event.data.stage === 'searching'
+                ? 'Searching Indian case precedents in Weaviate…'
+                : `Processing (${event.data.stage})…`);
+          setStreamingStatus(statusText);
         } else if (event.event === 'precedents') {
-          precedents = (event.data.precedents as VectorSearchResultItem[]) ?? [];
+          const incomingPrecedents = (event.data.precedents as VectorSearchResultItem[]) ?? [];
+          precedents = incomingPrecedents;
           standaloneQuery = event.data.standalone_query ?? null;
           setStreamingStatus('Synthesizing judicial opinion via Groq…');
+
           if (standaloneQuery && standaloneQuery !== trimmed) {
             setConversationMessages((prev) =>
               prev.map((m) =>
@@ -286,23 +295,40 @@ export default function ConsolePage() {
               )
             );
           }
-        } else if (event.event === 'token') {
-          accContent += event.data.token ?? '';
-          const currentContent = accContent;
+
+          // Immediately update AI placeholder with precedents so citations badge is ready
           const currentPrecedents = precedents;
           setConversationMessages((prev) =>
             prev.map((m) =>
               m.id === aiMsgId
-                ? { ...m, content: currentContent, precedents: currentPrecedents, isStreaming: true }
+                ? { ...m, precedents: currentPrecedents, standalone_query: standaloneQuery }
                 : m
             )
           );
+        } else if (event.event === 'token') {
+          const delta = event.data.delta ?? event.data.token ?? event.data.content ?? '';
+          if (delta) {
+            accContent += delta;
+            const currentContent = accContent;
+            const currentPrecedents = precedents;
+            setConversationMessages((prev) =>
+              prev.map((m) =>
+                m.id === aiMsgId
+                  ? { ...m, content: currentContent, precedents: currentPrecedents, isStreaming: true }
+                  : m
+              )
+            );
+          }
         } else if (event.event === 'done') {
           executionTimeMs = event.data.execution_time_ms ?? 0;
           tokensUsed = event.data.tokens_used;
+          if (event.data.standalone_query) {
+            standaloneQuery = event.data.standalone_query;
+          }
           break;
         } else if (event.event === 'error') {
-          throw new Error(event.data.message ?? 'Stream error');
+          const errMsg = event.data.error || event.data.message || event.data.detail || 'Stream error';
+          throw new Error(errMsg);
         }
       }
 
